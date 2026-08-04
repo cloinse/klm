@@ -1,7 +1,10 @@
 # Application updates
 
 KLM uses Sparkle 2 on macOS with ad-hoc application signatures and Ed25519
-update signatures. The updater is manual and runs only while KLM is open.
+update signatures. KLM performs one silent update probe when it opens. If a
+new version exists, a persistent in-app notice lets the user start the secure
+Sparkle download and installation flow. It runs only while KLM is open and
+does not schedule background checks.
 
 ## Distribution rules
 

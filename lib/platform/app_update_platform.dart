@@ -12,6 +12,8 @@ class AppUpdateInfo {
 abstract interface class AppUpdatePlatform {
   Future<AppUpdateInfo> getInfo();
 
+  Future<bool> probeForUpdates();
+
   Future<void> checkForUpdates();
 }
 
@@ -37,6 +39,10 @@ class MacOSAppUpdatePlatform implements AppUpdatePlatform {
   @override
   Future<void> checkForUpdates() =>
       _channel.invokeMethod<void>('checkForUpdates');
+
+  @override
+  Future<bool> probeForUpdates() async =>
+      await _channel.invokeMethod<bool>('probeForUpdates') ?? false;
 }
 
 class UnsupportedAppUpdatePlatform implements AppUpdatePlatform {
@@ -45,6 +51,9 @@ class UnsupportedAppUpdatePlatform implements AppUpdatePlatform {
   @override
   Future<AppUpdateInfo> getInfo() async =>
       const AppUpdateInfo(currentVersion: '', configured: false);
+
+  @override
+  Future<bool> probeForUpdates() async => false;
 
   @override
   Future<void> checkForUpdates() {

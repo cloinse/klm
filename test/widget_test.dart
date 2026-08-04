@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kontakt_library_manager/app/kontakt_library_manager_app.dart';
 import 'package:kontakt_library_manager/core/models/kontakt_library.dart';
 import 'package:kontakt_library_manager/core/models/kontakt_mutation.dart';
+import 'package:kontakt_library_manager/l10n/app_localizations.dart';
 import 'package:kontakt_library_manager/l10n/locale_controller.dart';
 import 'package:kontakt_library_manager/platform/app_update_platform.dart';
 import 'package:kontakt_library_manager/platform/kontakt_platform.dart';
@@ -30,6 +31,7 @@ void main() {
     expect(find.byTooltip('SNPID: ABC'), findsOneWidget);
     expect(find.text('K6'), findsNothing);
     expect(find.text('K7/8'), findsNothing);
+    expect(find.text('Reload'), findsOneWidget);
   });
 
   testWidgets('changes the interface language from Settings', (tester) async {
@@ -57,6 +59,7 @@ void main() {
 
     expect(find.text('Ajustes'), findsNWidgets(2));
     expect(find.text('Idioma de la interfaz'), findsOneWidget);
+    expect(const AppLocalizations(Locale('es')).refresh, 'Recargar');
     expect(localeController.language, AppLanguage.spanish);
 
     await tester.tap(find.text('Español'));
@@ -66,7 +69,47 @@ void main() {
 
     expect(find.text('Configurações'), findsNWidgets(2));
     expect(find.text('Idioma da interface'), findsOneWidget);
+    expect(const AppLocalizations(Locale('pt', 'BR')).refresh, 'Recarregar');
     expect(localeController.language, AppLanguage.portugueseBrazil);
+  });
+
+  testWidgets('shows a localized update notice after the launch probe', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final localeController = LocaleController();
+    final updatePlatform = _FakeAppUpdatePlatform(updateAvailable: true);
+    addTearDown(localeController.dispose);
+    await localeController.setLanguage(AppLanguage.spanish);
+
+    await tester.pumpWidget(
+      KontaktLibraryManagerApp(
+        platform: _FakePlatform(),
+        localeController: localeController,
+        updatePlatform: updatePlatform,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(updatePlatform.probeCount, 1);
+    expect(
+      find.byKey(const ValueKey('update-available-banner')),
+      findsOneWidget,
+    );
+    expect(find.text('Actualización disponible'), findsOneWidget);
+    expect(find.text('Descargar e instalar'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('download-install-update')));
+    await tester.pumpAndSettle();
+
+    expect(updatePlatform.checkCount, 1);
+    expect(
+      find.byKey(const ValueKey('update-available-banner')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('Settings only shows its title and changes the app theme', (
@@ -207,11 +250,21 @@ void main() {
 }
 
 class _FakeAppUpdatePlatform implements AppUpdatePlatform {
+  _FakeAppUpdatePlatform({this.updateAvailable = false});
+
+  final bool updateAvailable;
   int checkCount = 0;
+  int probeCount = 0;
 
   @override
   Future<AppUpdateInfo> getInfo() async =>
       const AppUpdateInfo(currentVersion: '1.0.0', configured: true);
+
+  @override
+  Future<bool> probeForUpdates() async {
+    probeCount += 1;
+    return updateAvailable;
+  }
 
   @override
   Future<void> checkForUpdates() async {

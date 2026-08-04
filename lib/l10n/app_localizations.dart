@@ -98,7 +98,7 @@ class AppLocalizations {
       'activity': 'Activity',
       'settings': 'Settings',
       'inventoryTitle': 'Installed Libraries',
-      'refresh': 'Refresh',
+      'refresh': 'Reload',
       'addLibrary': 'Add library',
       'addMultipleLibraries': 'Add multiple libraries',
       'confirm': 'Confirm',
@@ -194,6 +194,8 @@ class AppLocalizations {
       'updatesDescriptionWithVersion':
           'Version {version}. Updates are checked only while the app is open.',
       'checkForUpdates': 'Check for updates',
+      'updateAvailable': 'Update available',
+      'downloadAndInstall': 'Download and install',
       'updatesUnavailable': 'The update service is unavailable.',
       'inventorySummary': '{count} libraries detected.',
       'operation_inventory_updated_title': 'Inventory refreshed',
@@ -242,7 +244,7 @@ class AppLocalizations {
       'activity': 'Actividad',
       'settings': 'Ajustes',
       'inventoryTitle': 'Bibliotecas instaladas',
-      'refresh': 'Actualizar',
+      'refresh': 'Recargar',
       'addLibrary': 'Agregar librería',
       'addMultipleLibraries': 'Agregar múltiples librerías',
       'confirm': 'Confirmar',
@@ -339,6 +341,8 @@ class AppLocalizations {
       'updatesDescriptionWithVersion':
           'Versión {version}. Las actualizaciones solo se comprueban mientras la aplicación está abierta.',
       'checkForUpdates': 'Buscar actualizaciones',
+      'updateAvailable': 'Actualización disponible',
+      'downloadAndInstall': 'Descargar e instalar',
       'updatesUnavailable':
           'El servicio de actualizaciones no está disponible.',
       'inventorySummary': '{count} librerías detectadas.',
@@ -392,7 +396,7 @@ class AppLocalizations {
       'activity': 'Atividade',
       'settings': 'Configurações',
       'inventoryTitle': 'Bibliotecas instaladas',
-      'refresh': 'Atualizar',
+      'refresh': 'Recarregar',
       'addLibrary': 'Adicionar biblioteca',
       'addMultipleLibraries': 'Adicionar várias bibliotecas',
       'confirm': 'Confirmar',
@@ -487,6 +491,8 @@ class AppLocalizations {
       'updatesDescriptionWithVersion':
           'Versão {version}. As atualizações são verificadas somente enquanto o aplicativo está aberto.',
       'checkForUpdates': 'Buscar atualizações',
+      'updateAvailable': 'Atualização disponível',
+      'downloadAndInstall': 'Baixar e instalar',
       'updatesUnavailable': 'O serviço de atualizações não está disponível.',
       'inventorySummary': '{count} bibliotecas detectadas.',
       'operation_inventory_updated_title': 'Inventário atualizado',

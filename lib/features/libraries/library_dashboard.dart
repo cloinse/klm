@@ -32,11 +32,13 @@ class LibraryDashboard extends StatefulWidget {
 class _LibraryDashboardState extends State<LibraryDashboard> {
   DashboardSection _section = DashboardSection.library;
   late Future<AppUpdateInfo> _appUpdateInfo;
+  bool _updateAvailable = false;
 
   @override
   void initState() {
     super.initState();
     _appUpdateInfo = widget.updatePlatform.getInfo();
+    _probeForUpdates();
   }
 
   @override
@@ -44,6 +46,29 @@ class _LibraryDashboardState extends State<LibraryDashboard> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.updatePlatform != widget.updatePlatform) {
       _appUpdateInfo = widget.updatePlatform.getInfo();
+      _updateAvailable = false;
+      _probeForUpdates();
+    }
+  }
+
+  Future<void> _probeForUpdates() async {
+    try {
+      final available = await widget.updatePlatform.probeForUpdates();
+      if (mounted) setState(() => _updateAvailable = available);
+    } catch (_) {
+      // The launch check is intentionally silent when the feed is unavailable.
+    }
+  }
+
+  Future<void> _downloadAndInstallUpdate() async {
+    try {
+      await widget.updatePlatform.checkForUpdates();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.l10n.tr('updatesUnavailable'))),
+        );
+      }
     }
   }
 
@@ -64,6 +89,8 @@ class _LibraryDashboardState extends State<LibraryDashboard> {
                       section: _section,
                       attentionCount: widget.controller.attentionCount,
                       updateInfo: _appUpdateInfo,
+                      updateAvailable: _updateAvailable,
+                      onInstallUpdate: _downloadAndInstallUpdate,
                       onSelected: (section) =>
                           setState(() => _section = section),
                     ),
@@ -97,12 +124,85 @@ class _LibraryDashboardState extends State<LibraryDashboard> {
   };
 }
 
+class _UpdateAvailableBanner extends StatelessWidget {
+  const _UpdateAvailableBanner({
+    required this.compact,
+    required this.onInstall,
+  });
+
+  final bool compact;
+  final VoidCallback onInstall;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.klmColors;
+    if (compact) {
+      return Tooltip(
+        message:
+            '${context.l10n.tr('updateAvailable')} — '
+            '${context.l10n.tr('downloadAndInstall')}',
+        child: IconButton.filled(
+          key: const ValueKey('update-available-banner'),
+          onPressed: onInstall,
+          icon: const Icon(Icons.system_update_alt_rounded),
+        ),
+      );
+    }
+
+    return Container(
+      key: const ValueKey('update-available-banner'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colors.card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.system_update_alt_rounded,
+                size: 19,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  context.l10n.tr('updateAvailable'),
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          FilledButton(
+            key: const ValueKey('download-install-update'),
+            onPressed: onInstall,
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+            ),
+            child: Text(
+              context.l10n.tr('downloadAndInstall'),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _Sidebar extends StatelessWidget {
   const _Sidebar({
     required this.compact,
     required this.section,
     required this.attentionCount,
     required this.updateInfo,
+    required this.updateAvailable,
+    required this.onInstallUpdate,
     required this.onSelected,
   });
 
@@ -110,6 +210,8 @@ class _Sidebar extends StatelessWidget {
   final DashboardSection section;
   final int attentionCount;
   final Future<AppUpdateInfo> updateInfo;
+  final bool updateAvailable;
+  final VoidCallback onInstallUpdate;
   final ValueChanged<DashboardSection> onSelected;
 
   @override
@@ -197,6 +299,13 @@ class _Sidebar extends StatelessWidget {
             onTap: () => onSelected(DashboardSection.activity),
           ),
           const Spacer(),
+          if (updateAvailable) ...[
+            _UpdateAvailableBanner(
+              compact: compact,
+              onInstall: onInstallUpdate,
+            ),
+            const SizedBox(height: 12),
+          ],
           _NavigationItem(
             compact: compact,
             selected: section == DashboardSection.settings,

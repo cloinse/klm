@@ -39,9 +39,10 @@ aplica una operación confirmada. Tampoco se abre Terminal ni se invoca `sudo`.
 Las versiones Release se distribuyen en un DMG visual con la aplicación, una
 flecha de instalación y un enlace a Applications; solo pueden ejecutarse desde
 `/Applications`. Las actualizaciones de macOS usan Sparkle con firma Ed25519 y
-firma ad-hoc del bundle. La comprobación se inicia manualmente desde Settings y
-no mantiene procesos cuando KLM está cerrada. El procedimiento de publicación
-está documentado en
+firma ad-hoc del bundle. KLM hace una comprobación silenciosa al abrirse y
+muestra un aviso cuando hay una nueva versión; la descarga e instalación solo
+se inicia por decisión del usuario. No mantiene procesos cuando KLM está
+cerrada. El procedimiento de publicación está documentado en
 [`docs/updates.md`](docs/updates.md).
 
 La misma estrategia puntual se conserva en la compilación compatible con macOS
