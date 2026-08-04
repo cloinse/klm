@@ -21,7 +21,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Local Kontakt Libraries'), findsOneWidget);
+    expect(find.text('Installed Libraries'), findsOneWidget);
     expect(find.text('Analog Dreams'), findsOneWidget);
     expect(find.text('ABC'), findsOneWidget);
     expect(find.text('SNPID ABC'), findsNothing);
