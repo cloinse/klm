@@ -45,12 +45,27 @@ workflows:
       - name: Install Flutter dependencies
         script: |
           set -euo pipefail
-          flutter --version
-          dart --version
-          xcodebuild -version
-          flutter --version | /usr/bin/grep -q 'Flutter 3.38.9'
-          dart --version 2>&1 | /usr/bin/grep -q 'Dart SDK version: 3.10.8'
-          xcodebuild -version | /usr/bin/grep -q 'Xcode 16.4'
+          KLM_FLUTTER_VERSION="$(flutter --version)"
+          KLM_DART_VERSION="$(dart --version 2>&1)"
+          KLM_XCODE_VERSION="$(xcodebuild -version)"
+
+          /usr/bin/printf '%s\n' "$KLM_FLUTTER_VERSION"
+          /usr/bin/printf '%s\n' "$KLM_DART_VERSION"
+          /usr/bin/printf '%s\n' "$KLM_XCODE_VERSION"
+
+          case "$KLM_FLUTTER_VERSION" in
+            *'Flutter 3.38.9'*) ;;
+            *) exit 1 ;;
+          esac
+          case "$KLM_DART_VERSION" in
+            *'Dart SDK version: 3.10.8'*) ;;
+            *) exit 1 ;;
+          esac
+          case "$KLM_XCODE_VERSION" in
+            *'Xcode 16.4'*) ;;
+            *) exit 1 ;;
+          esac
+
           flutter pub get
 
       - name: Analyze and test
