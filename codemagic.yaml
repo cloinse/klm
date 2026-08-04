@@ -47,14 +47,11 @@ workflows:
 
           KLM_APP_INFO="macos/Runner/Configs/AppInfo.xcconfig"
           test "$(/usr/bin/grep -c \
-            'KLM_UPDATE_FEED_NAME = appcast-macos-current' \
-            "$KLM_APP_INFO")" -eq 1
-          /usr/bin/sed -i '' \
-            's/KLM_UPDATE_FEED_NAME = appcast-macos-current/KLM_UPDATE_FEED_NAME = appcast-macos-legacy/' \
-            "$KLM_APP_INFO"
-          test "$(/usr/bin/grep -c \
             'KLM_UPDATE_FEED_NAME = appcast-macos-legacy' \
             "$KLM_APP_INFO")" -eq 1
+          ! /usr/bin/grep -q \
+            'KLM_UPDATE_FEED_NAME = appcast-macos-current' \
+            "$KLM_APP_INFO"
 
       - name: Install Flutter dependencies
         script: |

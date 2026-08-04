@@ -31,6 +31,21 @@ class LibraryDashboard extends StatefulWidget {
 
 class _LibraryDashboardState extends State<LibraryDashboard> {
   DashboardSection _section = DashboardSection.library;
+  late Future<AppUpdateInfo> _appUpdateInfo;
+
+  @override
+  void initState() {
+    super.initState();
+    _appUpdateInfo = widget.updatePlatform.getInfo();
+  }
+
+  @override
+  void didUpdateWidget(covariant LibraryDashboard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.updatePlatform != widget.updatePlatform) {
+      _appUpdateInfo = widget.updatePlatform.getInfo();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,6 +63,7 @@ class _LibraryDashboardState extends State<LibraryDashboard> {
                       compact: compact,
                       section: _section,
                       attentionCount: widget.controller.attentionCount,
+                      updateInfo: _appUpdateInfo,
                       onSelected: (section) =>
                           setState(() => _section = section),
                     ),
@@ -86,12 +102,14 @@ class _Sidebar extends StatelessWidget {
     required this.compact,
     required this.section,
     required this.attentionCount,
+    required this.updateInfo,
     required this.onSelected,
   });
 
   final bool compact;
   final DashboardSection section;
   final int attentionCount;
+  final Future<AppUpdateInfo> updateInfo;
   final ValueChanged<DashboardSection> onSelected;
 
   @override
@@ -190,12 +208,21 @@ class _Sidebar extends StatelessWidget {
             const SizedBox(height: 14),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Text(
-                'v1.0.0 · Juan Ayala',
-                style: TextStyle(
-                  color: context.klmColors.tertiaryText,
-                  fontSize: 11,
-                ),
+              child: FutureBuilder<AppUpdateInfo>(
+                future: updateInfo,
+                builder: (context, snapshot) {
+                  final version = snapshot.data?.currentVersion.trim() ?? '';
+                  final footer = version.isEmpty
+                      ? 'Juan Ayala'
+                      : 'v$version · Juan Ayala';
+                  return Text(
+                    footer,
+                    style: TextStyle(
+                      color: context.klmColors.tertiaryText,
+                      fontSize: 11,
+                    ),
+                  );
+                },
               ),
             ),
           ],

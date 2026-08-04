@@ -13,9 +13,8 @@ PRODUCT_BUNDLE_IDENTIFIER = com.juanayala.kontaktLibraryManager
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 Juan Ayala. All rights reserved.
 
-// Sparkle checks only while KLM is open. Codemagic replaces the feed name for
-// the Catalina artifact so the legacy Flutter engine never receives a modern
-// macOS-only build.
-KLM_UPDATE_FEED_NAME = appcast-macos-current
+// Sparkle checks only while KLM is open. Every distributed build uses the
+// universal Catalina-compatible update channel.
+KLM_UPDATE_FEED_NAME = appcast-macos-legacy
 KLM_UPDATE_FEED_URL = https:/$()/raw.githubusercontent.com/cloinse/klm/main/updates/$(KLM_UPDATE_FEED_NAME).xml
 KLM_SPARKLE_PUBLIC_KEY = IEM06s9BrwRuC4XtbnRQi6/hVNrTP+aN0naS8RdQNA8=

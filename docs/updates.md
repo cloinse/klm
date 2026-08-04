@@ -15,7 +15,7 @@ update signatures. The updater is manual and runs only while KLM is open.
   `dmgbuild` dependencies; nothing is installed globally on the build machine.
 - The Kontakt administrator helper remains independent from Sparkle and
   Flutter frameworks.
-- The current and Catalina builds use separate signed appcasts.
+- Every distributed build uses the single signed legacy appcast.
 
 ## Private key
 
@@ -26,20 +26,16 @@ at `.secrets/KLM_SPARKLE_PRIVATE_KEY`; `.secrets/` is ignored by Git.
 For Codemagic, create the secret variable `KLM_SPARKLE_PRIVATE_KEY` with the
 exact contents of that file. Never commit or print this value.
 
-## Creating a local DMG and appcast
+## Publishing an update
 
-```bash
-flutter build macos --release
-tool/package_macos_dmg.sh \
-  "build/macos/Build/Products/Release/Kontakt Library Manager.app" \
-  "build/distribution/Kontakt-Library-Manager-macOS-12-v0.1.0.dmg"
+1. Increase the version and build number in `pubspec.yaml`.
+2. Run the `macos-catalina-legacy` Codemagic workflow.
+3. Publish its DMG and SHA-256 file in the matching GitHub Release.
+4. Copy the generated appcast artifact to:
 
-KLM_UPDATE_DOWNLOAD_URL_PREFIX="https://github.com/cloinse/klm/releases/download/v0.1.0" \
-  tool/generate_macos_appcast.sh \
-  build/distribution \
-  updates/appcast-macos-current.xml
+```text
+updates/appcast-macos-legacy.xml
 ```
 
-Publish the DMG and its checksum in the matching GitHub release, then commit
-the generated signed appcast. The first OTA-capable release must be installed
-manually; later releases can replace it through Sparkle.
+Commit the generated appcast without editing it. Existing installations will
+then discover the new release through Sparkle.

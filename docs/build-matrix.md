@@ -21,12 +21,14 @@ compatible with the Catalina variant. The shared Dart source therefore keeps a
 minimum SDK constraint of Dart 3.10.8 while the normal local build can continue
 using the current Flutter stable release.
 
-Both variants are distributed in DMG images containing the application and an
-`Applications` link. Every nested executable and framework uses an ad-hoc
-signature; Developer ID and Apple notarization are intentionally not used.
+The universal Catalina-compatible variant is distributed in a DMG containing
+the application and an `Applications` link. Every nested executable and
+framework uses an ad-hoc signature; Developer ID and Apple notarization are
+intentionally not used.
 Sparkle verifies OTA artifacts and feeds with the project's separate Ed25519
-key. The Catalina and current engines use separate appcasts so an incompatible
-Flutter engine cannot cross the deployment boundary.
+key. Only the universal Catalina-compatible engine is distributed, through the
+single `appcast-macos-legacy.xml` feed. The macOS 12 target remains the local
+development configuration.
 
 Source compatibility rules:
 
