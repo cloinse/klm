@@ -8,30 +8,24 @@ KLM_DMG_PATH="${2:-build/distribution/Kontakt-Library-Manager.dmg}"
 KLM_TOOL_DIRECTORY="$(CDPATH= cd -- "$(/usr/bin/dirname "$0")" && /bin/pwd)"
 
 test -d "$KLM_APP_PATH"
-"$KLM_TOOL_DIRECTORY/prepare_adhoc_sparkle.sh" "$KLM_APP_PATH"
+KLM_APP_PARENT="$(CDPATH= cd -- "$(/usr/bin/dirname "$KLM_APP_PATH")" && /bin/pwd)"
+KLM_APP_PATH="$KLM_APP_PARENT/$(/usr/bin/basename "$KLM_APP_PATH")"
+if test "${KLM_PREPARE_APP:-true}" = true; then
+  "$KLM_TOOL_DIRECTORY/prepare_adhoc_sparkle.sh" "$KLM_APP_PATH"
+fi
 /usr/bin/codesign --verify --deep --strict --verbose=2 "$KLM_APP_PATH"
 
 KLM_DMG_PARENT="$(/usr/bin/dirname "$KLM_DMG_PATH")"
 /bin/mkdir -p "$KLM_DMG_PARENT"
 
 KLM_DMG_ROOT="$(/usr/bin/mktemp -d /tmp/klm-dmg.XXXXXX)"
-KLM_DMG_SOURCE="$KLM_DMG_ROOT/source"
-KLM_READ_WRITE_DMG="$KLM_DMG_ROOT/Kontakt-Library-Manager-rw.dmg"
 KLM_TEMP_DMG="$KLM_DMG_ROOT/Kontakt-Library-Manager.dmg"
-KLM_ATTACH_PLIST="$KLM_DMG_ROOT/attach.plist"
-KLM_MOUNT_POINT=""
+KLM_BACKGROUND="$KLM_DMG_ROOT/background.png"
 KLM_SWIFT_CACHE="$KLM_DMG_ROOT/swift-module-cache"
-KLM_ATTACHED=false
-KLM_DEVICE=""
+KLM_DMGBUILD_VENV="$KLM_DMG_ROOT/dmgbuild-venv"
+KLM_PYTHON="${KLM_DMGBUILD_PYTHON:-$(command -v python3)}"
 
 cleanup() {
-  if test "$KLM_ATTACHED" = true; then
-    if test -n "$KLM_MOUNT_POINT"; then
-      /usr/bin/hdiutil detach "$KLM_MOUNT_POINT" -force >/dev/null 2>&1 || true
-    elif test -n "$KLM_DEVICE"; then
-      /usr/bin/hdiutil detach "$KLM_DEVICE" -force >/dev/null 2>&1 || true
-    fi
-  fi
   case "$KLM_DMG_ROOT" in
     /tmp/klm-dmg.*|/private/tmp/klm-dmg.*) /bin/rm -rf "$KLM_DMG_ROOT" ;;
     *) return 1 ;;
@@ -39,63 +33,28 @@ cleanup() {
 }
 trap cleanup EXIT
 
-/bin/mkdir -p "$KLM_DMG_SOURCE" "$KLM_SWIFT_CACHE"
-/usr/bin/ditto "$KLM_APP_PATH" "$KLM_DMG_SOURCE/${KLM_APP_NAME}.app"
-
-KLM_APP_KILOBYTES="$(/usr/bin/du -sk "$KLM_APP_PATH" | /usr/bin/awk '{ print $1 }')"
-KLM_IMAGE_KILOBYTES="$((KLM_APP_KILOBYTES + 32768))"
-/usr/bin/hdiutil create \
-  -volname "$KLM_APP_NAME" \
-  -srcfolder "$KLM_DMG_SOURCE" \
-  -fs HFS+ \
-  -format UDRW \
-  -size "${KLM_IMAGE_KILOBYTES}k" \
-  "$KLM_READ_WRITE_DMG"
-
-/usr/bin/hdiutil attach \
-  -nobrowse \
-  -noverify \
-  -plist \
-  "$KLM_READ_WRITE_DMG" > "$KLM_ATTACH_PLIST"
-KLM_ATTACHED=true
-for KLM_ENTITY_INDEX in 0 1 2 3 4 5; do
-  KLM_ENTITY_DEVICE="$(/usr/libexec/PlistBuddy -c \
-    "Print :system-entities:${KLM_ENTITY_INDEX}:dev-entry" \
-    "$KLM_ATTACH_PLIST" 2>/dev/null || true)"
-  if test -n "$KLM_ENTITY_DEVICE"; then
-    KLM_DEVICE="$KLM_ENTITY_DEVICE"
-  fi
-  KLM_ENTITY_MOUNT_POINT="$(/usr/libexec/PlistBuddy -c \
-    "Print :system-entities:${KLM_ENTITY_INDEX}:mount-point" \
-    "$KLM_ATTACH_PLIST" 2>/dev/null || true)"
-  if test -n "$KLM_ENTITY_MOUNT_POINT" && test -d "$KLM_ENTITY_MOUNT_POINT"; then
-    KLM_MOUNT_POINT="$KLM_ENTITY_MOUNT_POINT"
-    break
-  fi
-done
-test -d "$KLM_MOUNT_POINT"
-
-KLM_BACKGROUND_DIRECTORY="$KLM_MOUNT_POINT/.background"
-/bin/ln -s /Applications "$KLM_MOUNT_POINT/Applications"
-/bin/mkdir -p "$KLM_BACKGROUND_DIRECTORY"
+/bin/mkdir -p "$KLM_SWIFT_CACHE"
 CLANG_MODULE_CACHE_PATH="$KLM_SWIFT_CACHE" /usr/bin/xcrun swift \
   "$KLM_TOOL_DIRECTORY/create_dmg_background.swift" \
-  "$KLM_BACKGROUND_DIRECTORY/background.png"
-/usr/bin/touch "$KLM_MOUNT_POINT/.metadata_never_index"
-/usr/bin/osascript \
-  "$KLM_TOOL_DIRECTORY/configure_dmg.applescript" \
-  "$KLM_APP_NAME" \
-  "$KLM_APP_NAME"
-/bin/sync
-test -s "$KLM_MOUNT_POINT/.DS_Store"
-/usr/bin/hdiutil detach "$KLM_MOUNT_POINT"
-KLM_ATTACHED=false
+  "$KLM_BACKGROUND"
 
-/usr/bin/hdiutil convert \
-  "$KLM_READ_WRITE_DMG" \
-  -format UDZO \
-  -imagekey zlib-level=9 \
-  -o "$KLM_TEMP_DMG"
+"$KLM_PYTHON" -c \
+  'import sys; raise SystemExit(0 if sys.version_info >= (3, 9) else 1)'
+"$KLM_PYTHON" -m venv "$KLM_DMGBUILD_VENV"
+"$KLM_DMGBUILD_VENV/bin/python3" -m pip install \
+  --disable-pip-version-check \
+  --no-deps \
+  --no-compile \
+  --require-hashes \
+  -r "$KLM_TOOL_DIRECTORY/dmgbuild-requirements.txt"
+
+"$KLM_DMGBUILD_VENV/bin/dmgbuild" \
+  -s "$KLM_TOOL_DIRECTORY/dmg_settings.py" \
+  -D "app=$KLM_APP_PATH" \
+  -D "background=$KLM_BACKGROUND" \
+  "$KLM_APP_NAME" \
+  "$KLM_TEMP_DMG"
+
 /usr/bin/hdiutil verify "$KLM_TEMP_DMG"
 /bin/mv -f "$KLM_TEMP_DMG" "$KLM_DMG_PATH"
 /usr/bin/shasum -a 256 "$KLM_DMG_PATH" > "$KLM_DMG_PATH.sha256"

@@ -19,6 +19,7 @@ workflows:
     cache:
       cache_paths:
         - $HOME/.pub-cache
+        - $HOME/Library/Caches/pip
 
     scripts:
       - name: Configure macOS 10.15 deployment target
@@ -193,7 +194,8 @@ workflows:
             "$KLM_APP_PATH/Contents/Info.plist")"
           KLM_DMG="$KLM_LEGACY_DIRECTORY/Kontakt-Library-Manager-macOS-10.15-v${KLM_VERSION}.dmg"
           /bin/mkdir -p "$KLM_LEGACY_DIRECTORY"
-          tool/package_macos_dmg.sh "$KLM_APP_PATH" "$KLM_DMG"
+          KLM_PREPARE_APP=false \
+            tool/package_macos_dmg.sh "$KLM_APP_PATH" "$KLM_DMG"
 
       - name: Generate signed legacy appcast
         script: |

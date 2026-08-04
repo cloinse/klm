@@ -9,6 +9,10 @@ update signatures. The updater is manual and runs only while KLM is open.
 - Debug builds may run from the build directory for local development.
 - The DMG presents a fixed Finder layout with the app, an installation arrow,
   and an `Applications` link.
+- The layout metadata is generated without Finder or Apple Events, so the same
+  visual installer can be built in headless Codemagic workers.
+- The packaging script creates a temporary Python environment with hash-pinned
+  `dmgbuild` dependencies; nothing is installed globally on the build machine.
 - The Kontakt administrator helper remains independent from Sparkle and
   Flutter frameworks.
 - The current and Catalina builds use separate signed appcasts.

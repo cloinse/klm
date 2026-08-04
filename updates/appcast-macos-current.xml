@@ -1,6 +1,8 @@
-<?xml version="1.0" standalone="yes"?><!-- sparkle-sign-warning:
+<?xml version="1.0" standalone="yes"?>
+<!-- sparkle-sign-warning:
 IMPORTANT: This file was signed by Sparkle. Any modifications to this file requires re-signing this file with generate_appcast or sign_update! The signed signature will be embedded at the end of this file.
---><rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+-->
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
     <channel>
         <title>Kontakt Library Manager</title>
         <item>
@@ -9,10 +11,11 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
             <sparkle:version>1</sparkle:version>
             <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/cloinse/klm/releases/download/v0.1.0/Kontakt-Library-Manager-macOS-12-v0.1.0.dmg" length="18910605" type="application/octet-stream" sparkle:edSignature="VXrxQRZDAf2Q3J3sW8ZP505cEKPTDovjpUcq+jP08smxRzOkhw7aUZHHCFR7bY/3kAcxC7d6b1x+NJ8+NsqiDg=="></enclosure>
+            <enclosure url="https://github.com/cloinse/klm/releases/download/v0.1.0/Kontakt-Library-Manager-macOS-12-v0.1.0.dmg" length="18918958" type="application/octet-stream" sparkle:edSignature="DT4kh2JoQjNYTBBpQT8ZvylHuVmItll6bcjK9moEtHhhGYnbFSOj36JgEoLSO5ZdMQoZY5trv0uWTK1PIp9sBg=="/>
         </item>
     </channel>
-</rss><!-- sparkle-signatures:
-edSignature: +CUDwYBxm/prw/oOYrdby1sd/ksEUUq/DYYFHTKdPf+SbvzjdfiH4db2llA4alJ5Lf4T11VovKs5JUHzdELRAg==
-length: 1076
+</rss>
+<!-- sparkle-signatures:
+edSignature: qDz1kic29br3GH0H2J/1JWttZjv/MeFtD2ZyrY3myz2TFDnOwkIPmne/Gbw/+y4BESBuIynxwcLPoeKi0aUfDw==
+length: 1068
 -->
