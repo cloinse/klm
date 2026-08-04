@@ -1,0 +1,18 @@
+<?xml version="1.0" standalone="yes"?><!-- sparkle-sign-warning:
+IMPORTANT: This file was signed by Sparkle. Any modifications to this file requires re-signing this file with generate_appcast or sign_update! The signed signature will be embedded at the end of this file.
+--><rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>Kontakt Library Manager</title>
+        <item>
+            <title>0.1.0</title>
+            <pubDate>Tue, 04 Aug 2026 16:26:08 +0000</pubDate>
+            <sparkle:version>1</sparkle:version>
+            <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>10.15</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/cloinse/klm/releases/download/v0.1.0/Kontakt-Library-Manager-macOS-10.15-v0.1.0.dmg" length="18556610" type="application/octet-stream" sparkle:edSignature="pLZb82x24TICoujaliDBhF5JGlrPnxEicVGWWdaW9jSli/fIulFI8bbYBWvY18GwM28wKaZp5T9iBOLao7PtBw=="></enclosure>
+        </item>
+    </channel>
+</rss><!-- sparkle-signatures:
+edSignature: qAXCqSPofTtvCsFA/eEAjPrMLhK1/IR9xbVVfWQLKmQMLZHXRb4Unf2oiFX2Oa8kVhQhZFKRfncRybgaQDw7AQ==
+length: 1080
+-->
