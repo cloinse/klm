@@ -1,21 +1,18 @@
-<?xml version="1.0" standalone="yes"?>
-<!-- sparkle-sign-warning:
+<?xml version="1.0" standalone="yes"?><!-- sparkle-sign-warning:
 IMPORTANT: This file was signed by Sparkle. Any modifications to this file requires re-signing this file with generate_appcast or sign_update! The signed signature will be embedded at the end of this file.
--->
-<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+--><rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
     <channel>
         <title>Kontakt Library Manager</title>
         <item>
-            <title>1.1.0</title>
-            <pubDate>Tue, 04 Aug 2026 09:40:40 -0600</pubDate>
-            <sparkle:version>2</sparkle:version>
-            <sparkle:shortVersionString>1.1.0</sparkle:shortVersionString>
+            <title>0.1.0</title>
+            <pubDate>Tue, 04 Aug 2026 10:06:09 -0600</pubDate>
+            <sparkle:version>1</sparkle:version>
+            <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/cloinse/klm/releases/download/v1.1.0/Kontakt-Library-Manager-macOS-12-v1.1.0.dmg" length="18910650" type="application/octet-stream" sparkle:edSignature="C7KbjOxeJdXvj3l3JZcW6J3JzVHhQPpr1RtrqdA77b8LIqI7hRNO2LcF9A2ZqBpZ9PXMHonwx+n+TqWijO5uAQ=="/>
+            <enclosure url="https://github.com/cloinse/klm/releases/download/v0.1.0/Kontakt-Library-Manager-macOS-12-v0.1.0.dmg" length="18910605" type="application/octet-stream" sparkle:edSignature="VXrxQRZDAf2Q3J3sW8ZP505cEKPTDovjpUcq+jP08smxRzOkhw7aUZHHCFR7bY/3kAcxC7d6b1x+NJ8+NsqiDg=="></enclosure>
         </item>
     </channel>
-</rss>
-<!-- sparkle-signatures:
-edSignature: 4z8LpDpFXyfnqS44I0PAxNyu5TkD8RDrYdSLmVjqY7A8louacqDG5JT0rjayGMbPNjq0O30og6dFWIjRs/hzBw==
-length: 1068
+</rss><!-- sparkle-signatures:
+edSignature: +CUDwYBxm/prw/oOYrdby1sd/ksEUUq/DYYFHTKdPf+SbvzjdfiH4db2llA4alJ5Lf4T11VovKs5JUHzdELRAg==
+length: 1076
 -->

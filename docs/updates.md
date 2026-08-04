@@ -28,9 +28,9 @@ exact contents of that file. Never commit or print this value.
 flutter build macos --release
 tool/package_macos_dmg.sh \
   "build/macos/Build/Products/Release/Kontakt Library Manager.app" \
-  "build/distribution/Kontakt-Library-Manager-macOS-12-v1.1.0.dmg"
+  "build/distribution/Kontakt-Library-Manager-macOS-12-v0.1.0.dmg"
 
-KLM_UPDATE_DOWNLOAD_URL_PREFIX="https://github.com/cloinse/klm/releases/download/v1.1.0" \
+KLM_UPDATE_DOWNLOAD_URL_PREFIX="https://github.com/cloinse/klm/releases/download/v0.1.0" \
   tool/generate_macos_appcast.sh \
   build/distribution \
   updates/appcast-macos-current.xml
