@@ -127,6 +127,21 @@ workflows:
           verify_binary "$KLM_HELPER_BINARY"
           verify_binary "$KLM_FLUTTER_BINARY"
           verify_binary "$KLM_DART_BINARY"
+
+          # The elevated helper must be self-contained. Flutter 3.38 can expose
+          # the Runner's plugin linker flags through the project configuration;
+          # loading those app frameworks in an elevated process is rejected by
+          # macOS library validation when the build uses ad-hoc signing.
+          KLM_HELPER_LINKS="$(/usr/bin/otool -L "$KLM_HELPER_BINARY")"
+          /usr/bin/printf '%s\n' "$KLM_HELPER_LINKS"
+          case "$KLM_HELPER_LINKS" in
+            *'@rpath/'*|*'FlutterMacOS'*|*'shared_preferences_foundation'*)
+              /usr/bin/printf '%s\n' \
+                'The administrator helper contains an unexpected Flutter dependency.' >&2
+              exit 1
+              ;;
+          esac
+
           /usr/bin/codesign --verify --deep --strict --verbose=2 "$KLM_APP_PATH"
 
       - name: Package legacy application
