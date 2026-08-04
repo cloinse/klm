@@ -189,6 +189,12 @@ class AppLocalizations {
       'theme_system': 'System',
       'theme_light': 'Light',
       'theme_dark': 'Dark',
+      'updatesSection': 'Application updates',
+      'updatesDescription': 'Updates are checked only while the app is open.',
+      'updatesDescriptionWithVersion':
+          'Version {version}. Updates are checked only while the app is open.',
+      'checkForUpdates': 'Check for updates',
+      'updatesUnavailable': 'The update service is unavailable.',
       'inventorySummary': '{count} libraries detected.',
       'operation_inventory_updated_title': 'Inventory refreshed',
       'operation_inventory_error_title': 'Inventory error',
@@ -327,6 +333,14 @@ class AppLocalizations {
       'theme_system': 'Sistema',
       'theme_light': 'Claro',
       'theme_dark': 'Oscuro',
+      'updatesSection': 'Actualizaciones de la aplicación',
+      'updatesDescription':
+          'Las actualizaciones solo se comprueban mientras la aplicación está abierta.',
+      'updatesDescriptionWithVersion':
+          'Versión {version}. Las actualizaciones solo se comprueban mientras la aplicación está abierta.',
+      'checkForUpdates': 'Buscar actualizaciones',
+      'updatesUnavailable':
+          'El servicio de actualizaciones no está disponible.',
       'inventorySummary': '{count} librerías detectadas.',
       'operation_inventory_updated_title': 'Inventario actualizado',
       'operation_inventory_error_title': 'Error de inventario',
@@ -467,6 +481,13 @@ class AppLocalizations {
       'theme_system': 'Sistema',
       'theme_light': 'Claro',
       'theme_dark': 'Escuro',
+      'updatesSection': 'Atualizações do aplicativo',
+      'updatesDescription':
+          'As atualizações são verificadas somente enquanto o aplicativo está aberto.',
+      'updatesDescriptionWithVersion':
+          'Versão {version}. As atualizações são verificadas somente enquanto o aplicativo está aberto.',
+      'checkForUpdates': 'Buscar atualizações',
+      'updatesUnavailable': 'O serviço de atualizações não está disponível.',
       'inventorySummary': '{count} bibliotecas detectadas.',
       'operation_inventory_updated_title': 'Inventário atualizado',
       'operation_inventory_error_title': 'Erro no inventário',

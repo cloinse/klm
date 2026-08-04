@@ -4,6 +4,7 @@ import 'package:kontakt_library_manager/features/libraries/library_dashboard.dar
 import 'package:kontakt_library_manager/features/libraries/library_inventory_controller.dart';
 import 'package:kontakt_library_manager/l10n/app_localizations.dart';
 import 'package:kontakt_library_manager/l10n/locale_controller.dart';
+import 'package:kontakt_library_manager/platform/app_update_platform.dart';
 import 'package:kontakt_library_manager/platform/kontakt_platform.dart';
 import 'package:kontakt_library_manager/theme/app_theme.dart';
 import 'package:kontakt_library_manager/theme/theme_controller.dart';
@@ -14,11 +15,13 @@ class KontaktLibraryManagerApp extends StatefulWidget {
     required this.platform,
     this.localeController,
     this.themeController,
+    this.updatePlatform,
   });
 
   final KontaktPlatform platform;
   final LocaleController? localeController;
   final ThemeController? themeController;
+  final AppUpdatePlatform? updatePlatform;
 
   @override
   State<KontaktLibraryManagerApp> createState() =>
@@ -29,6 +32,7 @@ class _KontaktLibraryManagerAppState extends State<KontaktLibraryManagerApp> {
   late final LibraryInventoryController _controller;
   late final LocaleController _localeController;
   late final ThemeController _themeController;
+  late final AppUpdatePlatform _updatePlatform;
   late final bool _ownsLocaleController;
   late final bool _ownsThemeController;
 
@@ -39,6 +43,7 @@ class _KontaktLibraryManagerAppState extends State<KontaktLibraryManagerApp> {
     _ownsThemeController = widget.themeController == null;
     _localeController = widget.localeController ?? LocaleController();
     _themeController = widget.themeController ?? ThemeController();
+    _updatePlatform = widget.updatePlatform ?? createAppUpdatePlatform();
     _controller = LibraryInventoryController(widget.platform)..refresh();
   }
 
@@ -72,6 +77,7 @@ class _KontaktLibraryManagerAppState extends State<KontaktLibraryManagerApp> {
           controller: _controller,
           localeController: _localeController,
           themeController: _themeController,
+          updatePlatform: _updatePlatform,
         ),
       ),
     );

@@ -21,9 +21,12 @@ compatible with the Catalina variant. The shared Dart source therefore keeps a
 minimum SDK constraint of Dart 3.10.8 while the normal local build can continue
 using the current Flutter stable release.
 
-The generated ZIP is ad-hoc signed and intended for compatibility testing. A
-publicly distributed build still needs a Developer ID certificate and Apple
-notarization configured in Codemagic.
+Both variants are distributed in DMG images containing the application and an
+`Applications` link. Every nested executable and framework uses an ad-hoc
+signature; Developer ID and Apple notarization are intentionally not used.
+Sparkle verifies OTA artifacts and feeds with the project's separate Ed25519
+key. The Catalina and current engines use separate appcasts so an incompatible
+Flutter engine cannot cross the deployment boundary.
 
 Source compatibility rules:
 

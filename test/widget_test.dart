@@ -4,6 +4,7 @@ import 'package:kontakt_library_manager/app/kontakt_library_manager_app.dart';
 import 'package:kontakt_library_manager/core/models/kontakt_library.dart';
 import 'package:kontakt_library_manager/core/models/kontakt_mutation.dart';
 import 'package:kontakt_library_manager/l10n/locale_controller.dart';
+import 'package:kontakt_library_manager/platform/app_update_platform.dart';
 import 'package:kontakt_library_manager/platform/kontakt_platform.dart';
 import 'package:kontakt_library_manager/theme/theme_controller.dart';
 
@@ -76,12 +77,14 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final themeController = ThemeController();
+    final updatePlatform = _FakeAppUpdatePlatform();
     addTearDown(themeController.dispose);
 
     await tester.pumpWidget(
       KontaktLibraryManagerApp(
         platform: _FakePlatform(),
         themeController: themeController,
+        updatePlatform: updatePlatform,
       ),
     );
     await tester.pumpAndSettle();
@@ -97,6 +100,12 @@ void main() {
     );
     expect(find.text('macOS adapter'), findsNothing);
     expect(find.text('Appearance'), findsOneWidget);
+    expect(find.text('Application updates'), findsOneWidget);
+    expect(find.textContaining('Version 1.0.0'), findsOneWidget);
+
+    await tester.tap(find.text('Check for updates'));
+    await tester.pumpAndSettle();
+    expect(updatePlatform.checkCount, 1);
 
     await tester.tap(find.text('System'));
     await tester.pumpAndSettle();
@@ -193,6 +202,19 @@ void main() {
 
     expect(filteredHeight, unfilteredHeight);
   });
+}
+
+class _FakeAppUpdatePlatform implements AppUpdatePlatform {
+  int checkCount = 0;
+
+  @override
+  Future<AppUpdateInfo> getInfo() async =>
+      const AppUpdateInfo(currentVersion: '1.0.0', configured: true);
+
+  @override
+  Future<void> checkForUpdates() async {
+    checkCount += 1;
+  }
 }
 
 class _FakePlatform implements KontaktPlatform {

@@ -42,6 +42,17 @@ workflows:
             'MACOSX_DEPLOYMENT_TARGET = 12.0;' \
             "$KLM_PROJECT_FILE"
 
+          KLM_APP_INFO="macos/Runner/Configs/AppInfo.xcconfig"
+          test "$(/usr/bin/grep -c \
+            'KLM_UPDATE_FEED_NAME = appcast-macos-current' \
+            "$KLM_APP_INFO")" -eq 1
+          /usr/bin/sed -i '' \
+            's/KLM_UPDATE_FEED_NAME = appcast-macos-current/KLM_UPDATE_FEED_NAME = appcast-macos-legacy/' \
+            "$KLM_APP_INFO"
+          test "$(/usr/bin/grep -c \
+            'KLM_UPDATE_FEED_NAME = appcast-macos-legacy' \
+            "$KLM_APP_INFO")" -eq 1
+
       - name: Install Flutter dependencies
         script: |
           set -euo pipefail
@@ -73,9 +84,22 @@ workflows:
           set -euo pipefail
           flutter analyze --no-pub
           flutter test --no-pub
+          KLM_LOCATION_TEST="$(/usr/bin/mktemp /tmp/klm-location-test.XXXXXX)"
+          xcrun swiftc \
+            macos/Runner/Native/InstallationLocationValidator.swift \
+            test/native_install_location/main.swift \
+            -o "$KLM_LOCATION_TEST"
+          "$KLM_LOCATION_TEST"
+          /bin/rm "$KLM_LOCATION_TEST"
 
       - name: Build universal macOS Release
         script: flutter build macos --release --no-pub
+
+      - name: Prepare ad-hoc Sparkle bundle
+        script: |
+          set -euo pipefail
+          tool/prepare_adhoc_sparkle.sh \
+            "build/macos/Build/Products/Release/${KLM_APP_NAME}.app"
 
       - name: Verify Catalina compatibility
         script: |
@@ -85,6 +109,7 @@ workflows:
           KLM_HELPER_BINARY="$KLM_APP_PATH/Contents/Resources/KontaktLibraryHelper"
           KLM_FLUTTER_BINARY="$KLM_APP_PATH/Contents/Frameworks/FlutterMacOS.framework/Versions/A/FlutterMacOS"
           KLM_DART_BINARY="$KLM_APP_PATH/Contents/Frameworks/App.framework/Versions/A/App"
+          KLM_SPARKLE_BINARY="$KLM_APP_PATH/Contents/Frameworks/Sparkle.framework/Versions/B/Sparkle"
           KLM_PACKAGE_FILE="macos/Flutter/ephemeral/Packages/FlutterGeneratedPluginSwiftPackage/Package.swift"
 
           test -d "$KLM_APP_PATH"
@@ -128,6 +153,18 @@ workflows:
           verify_binary "$KLM_FLUTTER_BINARY"
           verify_binary "$KLM_DART_BINARY"
 
+          KLM_SPARKLE_ARCHS="$(/usr/bin/lipo "$KLM_SPARKLE_BINARY" -archs)"
+          case " $KLM_SPARKLE_ARCHS " in
+            *' x86_64 '*) ;;
+            *) exit 1 ;;
+          esac
+          case " $KLM_SPARKLE_ARCHS " in
+            *' arm64 '*) ;;
+            *) exit 1 ;;
+          esac
+          test ! -e \
+            "$KLM_APP_PATH/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices"
+
           # The elevated helper must be self-contained. Flutter 3.38 can expose
           # the Runner's plugin linker flags through the project configuration;
           # loading those app frameworks in an elevated process is rejected by
@@ -144,17 +181,37 @@ workflows:
 
           /usr/bin/codesign --verify --deep --strict --verbose=2 "$KLM_APP_PATH"
 
-      - name: Package legacy application
+      - name: Package legacy DMG
         script: |
           set -euo pipefail
           KLM_LEGACY_DIRECTORY="build/legacy"
-          KLM_ARCHIVE="$KLM_LEGACY_DIRECTORY/Kontakt-Library-Manager-macOS-10.15-Flutter-3.38.zip"
+          KLM_APP_PATH="build/macos/Build/Products/Release/${KLM_APP_NAME}.app"
+          KLM_VERSION="$(/usr/libexec/PlistBuddy -c \
+            'Print :CFBundleShortVersionString' \
+            "$KLM_APP_PATH/Contents/Info.plist")"
+          KLM_DMG="$KLM_LEGACY_DIRECTORY/Kontakt-Library-Manager-macOS-10.15-v${KLM_VERSION}.dmg"
           /bin/mkdir -p "$KLM_LEGACY_DIRECTORY"
-          /usr/bin/ditto -c -k --sequesterRsrc --keepParent \
-            "build/macos/Build/Products/Release/${KLM_APP_NAME}.app" \
-            "$KLM_ARCHIVE"
-          /usr/bin/shasum -a 256 "$KLM_ARCHIVE" > "$KLM_ARCHIVE.sha256"
+          tool/package_macos_dmg.sh "$KLM_APP_PATH" "$KLM_DMG"
+
+      - name: Generate signed legacy appcast
+        script: |
+          set -euo pipefail
+          if test -z "${KLM_SPARKLE_PRIVATE_KEY:-}"; then
+            /usr/bin/printf '%s\n' \
+              'KLM_SPARKLE_PRIVATE_KEY is not configured; appcast generation skipped.'
+            exit 0
+          fi
+
+          KLM_APP_PATH="build/macos/Build/Products/Release/${KLM_APP_NAME}.app"
+          KLM_VERSION="$(/usr/libexec/PlistBuddy -c \
+            'Print :CFBundleShortVersionString' \
+            "$KLM_APP_PATH/Contents/Info.plist")"
+          export KLM_UPDATE_DOWNLOAD_URL_PREFIX="https://github.com/cloinse/klm/releases/download/v${KLM_VERSION}"
+          tool/generate_macos_appcast.sh \
+            build/legacy \
+            build/legacy/appcast-macos-legacy.xml
 
     artifacts:
-      - build/legacy/Kontakt-Library-Manager-macOS-10.15-Flutter-3.38.zip
-      - build/legacy/Kontakt-Library-Manager-macOS-10.15-Flutter-3.38.zip.sha256
+      - build/legacy/*.dmg
+      - build/legacy/*.dmg.sha256
+      - build/legacy/appcast-macos-legacy.xml

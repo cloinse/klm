@@ -36,6 +36,14 @@ LaunchDaemon, servicio XPC, Ítem de inicio ni componente de fondo. La aplicaci�
 termina al cerrar su última ventana y el helper existe únicamente mientras se
 aplica una operación confirmada. Tampoco se abre Terminal ni se invoca `sudo`.
 
+Las versiones Release se distribuyen en un DMG visual con la aplicación, una
+flecha de instalación y un enlace a Applications; solo pueden ejecutarse desde
+`/Applications`. Las actualizaciones de macOS usan Sparkle con firma Ed25519 y
+firma ad-hoc del bundle. La comprobación se inicia manualmente desde Settings y
+no mantiene procesos cuando KLM está cerrada. El procedimiento de publicación
+está documentado en
+[`docs/updates.md`](docs/updates.md).
+
 La misma estrategia puntual se conserva en la compilación compatible con macOS
 10.15 mediante el workflow `macos-catalina-legacy` de Codemagic. El proyecto
 local permanece en macOS 12; únicamente el checkout temporal de CI cambia el
@@ -49,6 +57,12 @@ flutter pub get
 flutter analyze
 flutter test
 flutter run -d macos
+```
+
+Para crear el DMG local después de una compilación Release:
+
+```sh
+tool/package_macos_dmg.sh
 ```
 
 La compilación de Windows debe ejecutarse y validarse en Windows:

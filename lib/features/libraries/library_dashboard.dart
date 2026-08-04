@@ -5,6 +5,7 @@ import 'package:kontakt_library_manager/core/models/kontakt_mutation.dart';
 import 'package:kontakt_library_manager/features/libraries/library_inventory_controller.dart';
 import 'package:kontakt_library_manager/l10n/app_localizations.dart';
 import 'package:kontakt_library_manager/l10n/locale_controller.dart';
+import 'package:kontakt_library_manager/platform/app_update_platform.dart';
 import 'package:kontakt_library_manager/theme/app_theme.dart';
 import 'package:kontakt_library_manager/theme/theme_controller.dart';
 
@@ -16,11 +17,13 @@ class LibraryDashboard extends StatefulWidget {
     required this.controller,
     required this.localeController,
     required this.themeController,
+    required this.updatePlatform,
   });
 
   final LibraryInventoryController controller;
   final LocaleController localeController;
   final ThemeController themeController;
+  final AppUpdatePlatform updatePlatform;
 
   @override
   State<LibraryDashboard> createState() => _LibraryDashboardState();
@@ -73,6 +76,7 @@ class _LibraryDashboardState extends State<LibraryDashboard> {
     DashboardSection.settings => _SettingsView(
       localeController: widget.localeController,
       themeController: widget.themeController,
+      updatePlatform: widget.updatePlatform,
     ),
   };
 }
@@ -1543,10 +1547,12 @@ class _SettingsView extends StatelessWidget {
   const _SettingsView({
     required this.localeController,
     required this.themeController,
+    required this.updatePlatform,
   });
 
   final LocaleController localeController;
   final ThemeController themeController;
+  final AppUpdatePlatform updatePlatform;
 
   @override
   Widget build(BuildContext context) {
@@ -1560,6 +1566,8 @@ class _SettingsView extends StatelessWidget {
           _LanguageSettingsCard(localeController: localeController),
           const SizedBox(height: 14),
           _ThemeSettingsCard(themeController: themeController),
+          const SizedBox(height: 14),
+          _UpdateSettingsCard(updatePlatform: updatePlatform),
         ],
       ),
     );
@@ -1701,6 +1709,85 @@ class _ThemeSettingsCard extends StatelessWidget {
               themeController.setPreference(preference);
             }
           },
+        ),
+      ),
+    );
+  }
+}
+
+class _UpdateSettingsCard extends StatefulWidget {
+  const _UpdateSettingsCard({required this.updatePlatform});
+
+  final AppUpdatePlatform updatePlatform;
+
+  @override
+  State<_UpdateSettingsCard> createState() => _UpdateSettingsCardState();
+}
+
+class _UpdateSettingsCardState extends State<_UpdateSettingsCard> {
+  AppUpdateInfo? _info;
+  bool _loading = true;
+  bool _checking = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInfo();
+  }
+
+  Future<void> _loadInfo() async {
+    try {
+      final info = await widget.updatePlatform.getInfo();
+      if (mounted) setState(() => _info = info);
+    } catch (_) {
+      // A missing native adapter is represented as an unavailable updater.
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _checkForUpdates() async {
+    setState(() => _checking = true);
+    try {
+      await widget.updatePlatform.checkForUpdates();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.l10n.tr('updatesUnavailable'))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _checking = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final version = _info?.currentVersion ?? '';
+    final configured = _info?.configured ?? false;
+    final description = version.isEmpty
+        ? context.l10n.tr('updatesDescription')
+        : context.l10n.format('updatesDescriptionWithVersion', {
+            'version': version,
+          });
+
+    return _SettingsCard(
+      icon: Icons.system_update_alt_rounded,
+      title: context.l10n.tr('updatesSection'),
+      description: description,
+      child: SizedBox(
+        width: 205,
+        child: OutlinedButton.icon(
+          onPressed: _loading || _checking || !configured
+              ? null
+              : _checkForUpdates,
+          icon: _checking
+              ? const SizedBox.square(
+                  dimension: 15,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.refresh_rounded, size: 18),
+          label: Text(context.l10n.tr('checkForUpdates')),
         ),
       ),
     );
