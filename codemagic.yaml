@@ -98,8 +98,15 @@ workflows:
           verify_binary() {
             KLM_BINARY_PATH="$1"
             /usr/bin/file "$KLM_BINARY_PATH"
-            /usr/bin/lipo -verify_arch x86_64 "$KLM_BINARY_PATH"
-            /usr/bin/lipo -verify_arch arm64 "$KLM_BINARY_PATH"
+            KLM_BINARY_ARCHS="$(/usr/bin/lipo "$KLM_BINARY_PATH" -archs)"
+            case " $KLM_BINARY_ARCHS " in
+              *' x86_64 '*) ;;
+              *) exit 1 ;;
+            esac
+            case " $KLM_BINARY_ARCHS " in
+              *' arm64 '*) ;;
+              *) exit 1 ;;
+            esac
             KLM_INTEL_MINOS=$(xcrun vtool -arch x86_64 -show-build "$KLM_BINARY_PATH" | \
               /usr/bin/awk '/minos/ { print $2 }' | \
               /usr/bin/sort -u)
