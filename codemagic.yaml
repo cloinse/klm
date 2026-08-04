@@ -1,0 +1,123 @@
+workflows:
+  macos-catalina-legacy:
+    name: Kontakt Library Manager - macOS 10.15 (Flutter 3.38)
+    instance_type: mac_mini_m2
+    max_build_duration: 30
+
+    environment:
+      vars:
+        KLM_MACOS_DEPLOYMENT_TARGET: "10.15"
+        KLM_APP_NAME: "Kontakt Library Manager"
+      # Flutter 3.44.8 can fail while initializing DartVM on some Catalina
+      # Intel systems, so the legacy artifact stays on the previous engine.
+      flutter: 3.38.9
+      xcode: 16.4
+      cocoapods: default
+
+    cache:
+      cache_paths:
+        - $HOME/.pub-cache
+
+    scripts:
+      - name: Configure macOS 10.15 deployment target
+        script: |
+          set -euo pipefail
+          flutter clean
+
+          KLM_PROJECT_FILE="macos/Runner.xcodeproj/project.pbxproj"
+          KLM_SOURCE_TARGET_COUNT=$(/usr/bin/grep -c \
+            'MACOSX_DEPLOYMENT_TARGET = 12.0;' \
+            "$KLM_PROJECT_FILE")
+          test "$KLM_SOURCE_TARGET_COUNT" -eq 6
+
+          /usr/bin/sed -i '' \
+            "s/MACOSX_DEPLOYMENT_TARGET = 12.0;/MACOSX_DEPLOYMENT_TARGET = ${KLM_MACOS_DEPLOYMENT_TARGET};/g" \
+            "$KLM_PROJECT_FILE"
+
+          KLM_LEGACY_TARGET_COUNT=$(/usr/bin/grep -c \
+            "MACOSX_DEPLOYMENT_TARGET = ${KLM_MACOS_DEPLOYMENT_TARGET};" \
+            "$KLM_PROJECT_FILE")
+          test "$KLM_LEGACY_TARGET_COUNT" -eq 6
+          ! /usr/bin/grep -q \
+            'MACOSX_DEPLOYMENT_TARGET = 12.0;' \
+            "$KLM_PROJECT_FILE"
+
+      - name: Install Flutter dependencies
+        script: |
+          set -euo pipefail
+          flutter --version
+          dart --version
+          xcodebuild -version
+          flutter --version | /usr/bin/grep -q 'Flutter 3.38.9'
+          dart --version 2>&1 | /usr/bin/grep -q 'Dart SDK version: 3.10.8'
+          xcodebuild -version | /usr/bin/grep -q 'Xcode 16.4'
+          flutter pub get
+
+      - name: Analyze and test
+        script: |
+          set -euo pipefail
+          flutter analyze --no-pub
+          flutter test --no-pub
+
+      - name: Build universal macOS Release
+        script: flutter build macos --release --no-pub
+
+      - name: Verify Catalina compatibility
+        script: |
+          set -euo pipefail
+          KLM_APP_PATH="build/macos/Build/Products/Release/${KLM_APP_NAME}.app"
+          KLM_MAIN_BINARY="$KLM_APP_PATH/Contents/MacOS/$KLM_APP_NAME"
+          KLM_HELPER_BINARY="$KLM_APP_PATH/Contents/Resources/KontaktLibraryHelper"
+          KLM_FLUTTER_BINARY="$KLM_APP_PATH/Contents/Frameworks/FlutterMacOS.framework/Versions/A/FlutterMacOS"
+          KLM_DART_BINARY="$KLM_APP_PATH/Contents/Frameworks/App.framework/Versions/A/App"
+          KLM_PACKAGE_FILE="macos/Flutter/ephemeral/Packages/FlutterGeneratedPluginSwiftPackage/Package.swift"
+
+          test -d "$KLM_APP_PATH"
+          test "$(/usr/libexec/PlistBuddy -c \
+            'Print :LSMinimumSystemVersion' \
+            "$KLM_APP_PATH/Contents/Info.plist")" = "$KLM_MACOS_DEPLOYMENT_TARGET"
+          /usr/bin/grep -Fq \
+            ".macOS(\"$KLM_MACOS_DEPLOYMENT_TARGET\")" \
+            "$KLM_PACKAGE_FILE"
+
+          verify_binary() {
+            KLM_BINARY_PATH="$1"
+            /usr/bin/file "$KLM_BINARY_PATH"
+            /usr/bin/lipo -verify_arch x86_64 "$KLM_BINARY_PATH"
+            /usr/bin/lipo -verify_arch arm64 "$KLM_BINARY_PATH"
+            KLM_INTEL_MINOS=$(xcrun vtool -arch x86_64 -show-build "$KLM_BINARY_PATH" | \
+              /usr/bin/awk '/minos/ { print $2 }' | \
+              /usr/bin/sort -u)
+            test "$KLM_INTEL_MINOS" = "$KLM_MACOS_DEPLOYMENT_TARGET"
+
+            # Apple Silicon starts at macOS 11, so an arm64 framework may
+            # correctly report 11.0 even though its Intel slice supports 10.15.
+            KLM_ARM_MINOS=$(xcrun vtool -arch arm64 -show-build "$KLM_BINARY_PATH" | \
+              /usr/bin/awk '/minos/ { print $2 }' | \
+              /usr/bin/sort -u)
+            case "$KLM_ARM_MINOS" in
+              10.15|11.0) ;;
+              *) exit 1 ;;
+            esac
+          }
+
+          verify_binary "$KLM_MAIN_BINARY"
+          verify_binary "$KLM_HELPER_BINARY"
+          verify_binary "$KLM_FLUTTER_BINARY"
+          verify_binary "$KLM_DART_BINARY"
+          /usr/bin/codesign --verify --deep --strict --verbose=2 "$KLM_APP_PATH"
+
+      - name: Package legacy application
+        script: |
+          set -euo pipefail
+          KLM_LEGACY_DIRECTORY="build/legacy"
+          KLM_ARCHIVE="$KLM_LEGACY_DIRECTORY/Kontakt-Library-Manager-macOS-10.15-Flutter-3.38.zip"
+          /bin/mkdir -p "$KLM_LEGACY_DIRECTORY"
+          /usr/bin/ditto -c -k --sequesterRsrc --keepParent \
+            "build/macos/Build/Products/Release/${KLM_APP_NAME}.app" \
+            "$KLM_ARCHIVE"
+          /usr/bin/shasum -a 256 "$KLM_ARCHIVE" > "$KLM_ARCHIVE.sha256"
+
+    artifacts:
+      - build/legacy/Kontakt-Library-Manager-macOS-10.15-Flutter-3.38.zip
+      - build/legacy/Kontakt-Library-Manager-macOS-10.15-Flutter-3.38.zip.sha256

@@ -1,0 +1,76 @@
+# Kontakt Library Manager
+
+Aplicación Flutter de escritorio para inventariar y diagnosticar librerías de
+Kontakt en macOS y Windows.
+
+## Estado actual
+
+El inventario y los diagnósticos son funcionales en modo de lectura:
+
+- Usa inglés de forma predeterminada y permite seleccionar español o portugués
+  de Brasil desde Settings. La selección se aplica inmediatamente y se guarda.
+- Reconcilia XML de Service Center, PLIST de macOS y JSON de
+  `installed_products`.
+- Muestra el SNPID normalizado de cada librería y reserva el indicador de estado
+  para sus diagnósticos generales.
+- Detecta registros incompletos, rutas perdidas, discos desconectados, SNPID
+  duplicados y rutas compartidas.
+- Permite buscar, filtrar, ordenar y mostrar el contenido en Finder/Explorador.
+- Conserva un registro de operaciones y errores durante la sesión.
+- Se centra exclusivamente en el navegador clásico de Kontakt. Lee el orden
+  `UserListIndex`, permite reorganizar librerías mediante arrastre y guarda los
+  cambios en las preferencias del usuario sin autorización administrativa.
+- Incluye el adaptador Windows para XML y JSON. El Registro permanece
+  deliberadamente deshabilitado hasta validar sus vistas de 32/64 bits en una
+  máquina Windows con Kontakt instalado.
+
+La segunda fase agrega los flujos de alta individual y por lote, reparación,
+reubicación y eliminación exclusiva de registros. En macOS se canalizan a un
+ejecutable nativo incluido dentro de la aplicación. Al confirmar un cambio,
+macOS muestra su diálogo normal de administrador, ejecuta una sola transacción
+y cierra el componente inmediatamente. La app Flutter no se ejecuta como
+administrador y el helper no acepta rutas de destino arbitrarias.
+
+Ni la aplicación ni el helper son procesos residentes. No se instala ningún
+LaunchDaemon, servicio XPC, Ítem de inicio ni componente de fondo. La aplicación
+termina al cerrar su última ventana y el helper existe únicamente mientras se
+aplica una operación confirmada. Tampoco se abre Terminal ni se invoca `sudo`.
+
+La misma estrategia puntual se conserva en la compilación compatible con macOS
+10.15 mediante el workflow `macos-catalina-legacy` de Codemagic. El proyecto
+local permanece en macOS 12; únicamente el checkout temporal de CI cambia el
+deployment target. La matriz está documentada en
+[`docs/build-matrix.md`](docs/build-matrix.md).
+
+## Desarrollo
+
+```sh
+flutter pub get
+flutter analyze
+flutter test
+flutter run -d macos
+```
+
+La compilación de Windows debe ejecutarse y validarse en Windows:
+
+```powershell
+flutter build windows
+```
+
+## Arquitectura
+
+```text
+lib/
+  app/                       tema y raíz de la aplicación
+  core/models/               modelo común de librerías y diagnósticos
+  core/metadata/             extracción segura de ProductHints
+  core/validation/           rutas, duplicados y registros incompletos
+  features/libraries/        controlador e interfaz principal
+  platform/                  contrato común y ensamblador de inventario
+  platform/macos/            XML, PLIST y JSON de macOS
+  platform/windows/          XML y JSON de Windows
+```
+
+El navegador moderno, los mosaicos NKS y la base de datos `komplete.db3` quedan
+fuera del alcance. Kontakt y cualquier DAW que lo esté utilizando deben cerrarse
+antes de guardar un nuevo orden clásico.
