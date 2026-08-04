@@ -14,6 +14,8 @@ does not schedule background checks.
   and an `Applications` link.
 - The layout metadata is generated without Finder or Apple Events, so the same
   visual installer can be built in headless Codemagic workers.
+- Codemagic names the distributable `klm-macOS-10.15+-vX.Y.Z.dmg`; the
+  application inside remains `Kontakt Library Manager.app`.
 - The packaging script creates a temporary Python environment with hash-pinned
   `dmgbuild` dependencies; nothing is installed globally on the build machine.
 - The Kontakt administrator helper remains independent from Sparkle and

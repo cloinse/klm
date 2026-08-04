@@ -189,7 +189,7 @@ workflows:
           KLM_VERSION="$(/usr/libexec/PlistBuddy -c \
             'Print :CFBundleShortVersionString' \
             "$KLM_APP_PATH/Contents/Info.plist")"
-          KLM_DMG="$KLM_LEGACY_DIRECTORY/Kontakt-Library-Manager-macOS-10.15-v${KLM_VERSION}.dmg"
+          KLM_DMG="$KLM_LEGACY_DIRECTORY/klm-macOS-10.15+-v${KLM_VERSION}.dmg"
           /bin/mkdir -p "$KLM_LEGACY_DIRECTORY"
           KLM_PREPARE_APP=false \
             tool/package_macos_dmg.sh "$KLM_APP_PATH" "$KLM_DMG"
