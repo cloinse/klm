@@ -114,8 +114,8 @@ final class KontaktSystemBridge {
       guard let regKey = safePreferenceComponent(rawEntry["regKey"] as? String),
             let name = safePreferenceComponent(rawEntry["name"] as? String),
             let index = rawEntry["userListIndex"] as? Int,
-            index >= 0,
-            index < rawEntries.count,
+            index >= 1,
+            index <= rawEntries.count,
             regKeys.insert(regKey.lowercased()).inserted,
             indexes.insert(index).inserted
       else {
@@ -155,6 +155,16 @@ final class KontaktSystemBridge {
           FlutterError(
             code: "classic_order_write_failed",
             message: "The order for \(entry.name) could not be saved.",
+            details: nil
+          )
+        )
+        return
+      }
+      guard preferences.integer(forKey: "UserListIndex") == entry.index else {
+        result(
+          FlutterError(
+            code: "classic_order_write_failed",
+            message: "The saved order for \(entry.name) could not be verified.",
             details: nil
           )
         )

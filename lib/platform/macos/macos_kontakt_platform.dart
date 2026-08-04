@@ -276,7 +276,8 @@ class MacOSKontaktPlatform implements KontaktPlatform {
         'regKey': regKey,
         'name': library.name,
         if (library.snpid != null) 'snpid': library.snpid!,
-        'userListIndex': index,
+        // Kontakt's classic browser stores positions as a one-based sequence.
+        'userListIndex': index + 1,
       });
     }
     await _systemChannel.invokeMethod<void>('saveClassicOrder', {

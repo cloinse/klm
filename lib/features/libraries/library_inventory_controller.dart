@@ -118,7 +118,7 @@ class LibraryInventoryController extends ChangeNotifier {
       snapshot = InventorySnapshot(
         libraries: [
           for (var index = 0; index < ordered.length; index++)
-            ordered[index].copyWith(userListIndex: index),
+            ordered[index].copyWith(userListIndex: index + 1),
         ],
         diagnostics: snapshot!.diagnostics,
         scannedAt: snapshot!.scannedAt,

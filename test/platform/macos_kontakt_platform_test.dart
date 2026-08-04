@@ -1,10 +1,13 @@
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kontakt_library_manager/core/models/kontakt_library.dart';
 import 'package:kontakt_library_manager/platform/macos/macos_kontakt_platform.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test('reconcilia XML, JSON y PLIST como una sola librería', () async {
     if (!Platform.isMacOS) return;
     final root = await Directory.systemTemp.createTemp('klm-adapter-test-');
@@ -63,5 +66,35 @@ void main() {
     expect(library.registeredForKontakt78, isTrue);
     expect(library.health, LibraryHealth.healthy);
     expect(library.userListIndex, 7);
+  });
+
+  test('writes the classic Kontakt order with one-based indexes', () async {
+    const channel = MethodChannel('com.juanayala.kontaktLibraryManager/system');
+    MethodCall? capturedCall;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          capturedCall = call;
+          return null;
+        });
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null),
+    );
+
+    final adapter = MacOSKontaktPlatform();
+    await adapter.saveClassicLibraryOrder(const [
+      KontaktLibrary(id: 'gamma', name: 'Gamma', regKey: 'Gamma'),
+      KontaktLibrary(id: 'alpha', name: 'Alpha', regKey: 'Alpha'),
+    ]);
+
+    expect(capturedCall?.method, 'saveClassicOrder');
+    final arguments = capturedCall?.arguments as Map<Object?, Object?>;
+    final entries = arguments['entries'] as List<Object?>;
+    expect(
+      entries.cast<Map<Object?, Object?>>().map(
+        (entry) => entry['userListIndex'],
+      ),
+      [1, 2],
+    );
   });
 }

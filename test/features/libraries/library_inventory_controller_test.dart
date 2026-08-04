@@ -43,8 +43,17 @@ void main() {
     expect(controller.hasUnsavedCustomOrder, isFalse);
     expect(
       controller.snapshot!.libraries.map((library) => library.userListIndex),
-      [0, 1, 2],
+      [1, 2, 3],
     );
+
+    final reopenedController = LibraryInventoryController(platform);
+    addTearDown(reopenedController.dispose);
+    await reopenedController.refresh();
+    expect(reopenedController.visibleLibraries.map((library) => library.name), [
+      'Gamma',
+      'Alpha',
+      'Beta',
+    ]);
   });
 
   test('reordering is disabled while filtering the inventory', () async {
@@ -107,6 +116,10 @@ class _OrderPlatform implements KontaktPlatform {
   @override
   Future<void> saveClassicLibraryOrder(List<KontaktLibrary> libraries) async {
     savedOrder = List<KontaktLibrary>.of(libraries);
+    this.libraries = [
+      for (var index = 0; index < libraries.length; index++)
+        libraries[index].copyWith(userListIndex: index + 1),
+    ];
   }
 
   @override
