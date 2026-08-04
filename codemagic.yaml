@@ -5,6 +5,8 @@ workflows:
     max_build_duration: 30
 
     environment:
+      groups:
+        - klm_secrets
       vars:
         KLM_MACOS_DEPLOYMENT_TARGET: "10.15"
         KLM_APP_NAME: "Kontakt Library Manager"
