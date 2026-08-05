@@ -240,10 +240,8 @@ workflows:
       - name: Build Windows Release
         script: flutter build windows --release --no-pub
 
-      - name: Package Windows bundle
-        script: |
-          cd build/windows/x64/runner/Release
-          7z a -tzip -mx=1 -r ../Kontakt-Library-Manager-Windows.zip ./*
+      - name: Package single-file Windows portable
+        script: powershell -NoProfile -ExecutionPolicy Bypass -File tool/windows/package_portable_sfx.ps1
 
     artifacts:
-      - build/windows/x64/runner/Kontakt-Library-Manager-Windows.zip
+      - build/windows/x64/runner/Kontakt-Library-Manager-Windows.exe
