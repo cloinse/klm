@@ -66,18 +66,11 @@ Para crear el DMG local después de una compilación Release:
 tool/package_macos_dmg.sh
 ```
 
-La compilación y el portable de Windows deben generarse en Windows:
+La compilación de Windows debe ejecutarse y validarse en Windows:
 
 ```powershell
-flutter build windows --release
-powershell -NoProfile -ExecutionPolicy Bypass -File tool/windows/package_portable_sfx.ps1
+flutter build windows
 ```
-
-El resultado es `build/windows/x64/runner/Kontakt-Library-Manager-Windows.exe`.
-Es un único ejecutable portable basado en `7zS2.sfx` del SDK LZMA oficial.
-Se ejecuta con los permisos normales del usuario, espera a que Kontakt Library
-Manager termine y elimina después todos los archivos extraídos en la carpeta
-temporal. Las solicitudes UAC permanecen bajo el control de la aplicación.
 
 ## Arquitectura
 
