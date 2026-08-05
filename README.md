@@ -72,6 +72,25 @@ La compilación de Windows debe ejecutarse y validarse en Windows:
 flutter build windows
 ```
 
+### Portable Windows en Codemagic
+
+El workflow `windows-release` genera un único artefacto:
+
+```text
+Kontakt-Library-Manager-Portable.exe
+```
+
+El ejecutable autoextraíble contiene la aplicación, sus datos y las DLL del
+runtime de Visual C++. Al abrirlo, extrae esos componentes en una ubicación
+temporal, ejecuta Kontakt Library Manager, espera a que termine y elimina los
+archivos temporales. No instala la aplicación ni muestra sus archivos internos
+al usuario.
+
+El contenedor usa `7zS2.sfx` del
+[SDK LZMA oficial](https://www.7-zip.org/sdk.html), descargado durante el build
+y validado mediante SHA-256. Se ejecuta como el usuario actual para no cambiar
+el flujo UAC propio de Kontakt Library Manager.
+
 ## Arquitectura
 
 ```text
