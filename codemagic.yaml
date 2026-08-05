@@ -216,3 +216,38 @@ workflows:
       - build/legacy/*.dmg
       - build/legacy/*.dmg.sha256
       - build/legacy/appcast-macos-legacy.xml
+
+  windows-release:
+    name: Kontakt Library Manager - Windows
+    instance_type: windows_x2
+    max_build_duration: 30
+
+    environment:
+      flutter: stable
+
+    cache:
+      cache_paths:
+        - ~/.pub-cache
+
+    scripts:
+      - name: Install Flutter dependencies
+        script: |
+          flutter --version
+          flutter config --enable-windows-desktop
+          flutter pub get
+
+      - name: Analyze and test
+        script: |
+          flutter analyze --no-pub
+          flutter test --no-pub
+
+      - name: Build Windows Release
+        script: flutter build windows --release --no-pub
+
+      - name: Package Windows bundle
+        script: |
+          cd build/windows/x64/runner/Release
+          7z a -r ../Kontakt-Library-Manager-Windows.zip ./*
+
+    artifacts:
+      - build/windows/x64/runner/Kontakt-Library-Manager-Windows.zip
