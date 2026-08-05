@@ -9,6 +9,7 @@ flutter/ephemeral/
 # Visual Studio build-related files.
 x64/
 x86/
+runner/third_party/winsparkle/
 
 # Visual Studio cache files
 # files ending in .cache can be ignored

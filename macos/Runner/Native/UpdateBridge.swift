@@ -125,8 +125,12 @@ final class UpdateBridge: NSObject, SPUUpdaterDelegate {
     let version = Bundle.main.object(
       forInfoDictionaryKey: "CFBundleShortVersionString"
     ) as? String ?? ""
+    let build = Bundle.main.object(
+      forInfoDictionaryKey: "CFBundleVersion"
+    ) as? String ?? ""
     return [
       "currentVersion": version,
+      "currentBuild": build,
       "configured": updaterController != nil,
     ]
   }

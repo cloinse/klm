@@ -223,12 +223,16 @@ workflows:
     max_build_duration: 20
 
     environment:
+      groups:
+        - klm_secrets
       flutter: stable
 
     cache:
       cache_paths:
         - ~/.pub-cache
         - $CM_BUILD_DIR/build/windows/x64
+        - ~/.klm-tools/winsparkle-0.9.4
+        - ~/.klm-tools/inno-7.0.2
 
     scripts:
       - name: Install Flutter dependencies
@@ -237,13 +241,118 @@ workflows:
           flutter config --enable-windows-desktop
           flutter pub get
 
+      - name: Prepare verified Windows packaging tools
+        script: |
+          $ErrorActionPreference = 'Stop'
+
+          $ToolsRoot = Join-Path $env:USERPROFILE '.klm-tools'
+          New-Item -ItemType Directory -Force -Path $ToolsRoot | Out-Null
+          $WinSparkleRoot = Join-Path $ToolsRoot 'winsparkle-0.9.4'
+          $WinSparkleDll = Join-Path $WinSparkleRoot 'WinSparkle.dll'
+          $WinSparkleTool = Join-Path $WinSparkleRoot 'winsparkle-tool.exe'
+          if (-not (Test-Path $WinSparkleDll) -or
+              -not (Test-Path $WinSparkleTool)) {
+            $WinSparkleArchive = Join-Path $env:TEMP 'WinSparkle-0.9.4.zip'
+            Invoke-WebRequest `
+              'https://github.com/vslavik/winsparkle/releases/download/v0.9.4/WinSparkle-0.9.4.zip' `
+              -OutFile $WinSparkleArchive
+            $ActualHash = (Get-FileHash $WinSparkleArchive -Algorithm SHA256).Hash.ToLower()
+            if ($ActualHash -ne '6037df37fc263bd1650a1c4949681a9d40ffe991d01f35892a406cb5d103c976') {
+              throw 'WinSparkle archive checksum mismatch.'
+            }
+            Remove-Item $WinSparkleRoot -Recurse -Force -ErrorAction SilentlyContinue
+            $ExtractRoot = Join-Path $env:TEMP 'klm-winsparkle-extract'
+            Remove-Item $ExtractRoot -Recurse -Force -ErrorAction SilentlyContinue
+            Expand-Archive $WinSparkleArchive -DestinationPath $ExtractRoot
+            New-Item -ItemType Directory -Force -Path $WinSparkleRoot | Out-Null
+            $ExtractedSdk = Join-Path $ExtractRoot 'WinSparkle-0.9.4'
+            Copy-Item (Join-Path $ExtractedSdk 'x64\Release\WinSparkle.dll') `
+              $WinSparkleDll
+            Copy-Item (Join-Path $ExtractedSdk 'bin\winsparkle-tool.exe') `
+              $WinSparkleTool
+          }
+
+          $InnoRoot = Join-Path $ToolsRoot 'inno-7.0.2'
+          $InnoCompiler = Join-Path $InnoRoot 'ISCC.exe'
+          if (-not (Test-Path $InnoCompiler)) {
+            $InnoInstaller = Join-Path $env:TEMP 'innosetup-7.0.2-x64.exe'
+            Invoke-WebRequest `
+              'https://github.com/jrsoftware/issrc/releases/download/is-7_0_2/innosetup-7.0.2-x64.exe' `
+              -OutFile $InnoInstaller
+            $ActualHash = (Get-FileHash $InnoInstaller -Algorithm SHA256).Hash.ToLower()
+            if ($ActualHash -ne '5ad54ca3def786f8f4212552e54cc6d8d61329e2d24a1cfee0571d42c2684ff1') {
+              throw 'Inno Setup installer checksum mismatch.'
+            }
+            New-Item -ItemType Directory -Force -Path $InnoRoot | Out-Null
+            & $InnoInstaller /VERYSILENT /SUPPRESSMSGBOXES /NORESTART `
+              /CURRENTUSER "/DIR=$InnoRoot"
+            if ($LASTEXITCODE -ne 0 -or -not (Test-Path $InnoCompiler)) {
+              throw 'Inno Setup installation failed.'
+            }
+          }
+
+          $UpdaterDirectory = 'windows\runner\third_party\winsparkle'
+          New-Item -ItemType Directory -Force -Path $UpdaterDirectory | Out-Null
+          Copy-Item $WinSparkleDll (Join-Path $UpdaterDirectory 'WinSparkle.dll') -Force
+
       - name: Build Windows Release
         script: flutter build windows --release --no-pub
 
-      - name: Package Windows bundle
+      - name: Build signed Windows installer feed
         script: |
-          cd build/windows/x64/runner/Release
-          7z a -tzip -mx=1 -r ../Kontakt-Library-Manager-Windows.zip ./*
+          $ErrorActionPreference = 'Stop'
+          $VersionMatch = Select-String -Path 'pubspec.yaml' `
+            -Pattern '^version:\s*([0-9]+\.[0-9]+\.[0-9]+)\+([0-9]+)\s*$'
+          if ($VersionMatch.Matches.Count -ne 1) {
+            throw 'pubspec.yaml must contain a semantic version and numeric build.'
+          }
+          $Version = $VersionMatch.Matches[0].Groups[1].Value
+          $Build = $VersionMatch.Matches[0].Groups[2].Value
+          $ReleaseDirectory = (Resolve-Path 'build\windows\x64\runner\Release').Path
+          if (-not (Test-Path (Join-Path $ReleaseDirectory 'WinSparkle.dll'))) {
+            throw 'The release bundle does not contain WinSparkle.dll.'
+          }
+
+          $OutputDirectory = Join-Path $env:CM_BUILD_DIR `
+            'build\windows\x64\runner\installer'
+          New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
+          $InnoCompiler = Join-Path $env:USERPROFILE `
+            '.klm-tools\inno-7.0.2\ISCC.exe'
+          & $InnoCompiler `
+            "/DMyAppVersion=$Version" `
+            "/DMyAppBuild=$Build" `
+            "/DMySourceDir=$ReleaseDirectory" `
+            "/DMyOutputDir=$OutputDirectory" `
+            'windows\installer\kontakt_library_manager.iss'
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup compilation failed.' }
+
+          $Installer = Join-Path $OutputDirectory `
+            "Kontakt-Library-Manager-Windows-v$Version-Setup.exe"
+          if (-not (Test-Path $Installer)) { throw 'Installer was not created.' }
+          $InstallerHash = (Get-FileHash $Installer -Algorithm SHA256).Hash.ToLower()
+          $HashPath = "$Installer.sha256"
+          [IO.File]::WriteAllText(
+            $HashPath,
+            "$InstallerHash  $([IO.Path]::GetFileName($Installer))`n",
+            [Text.UTF8Encoding]::new($false)
+          )
+
+          if ([string]::IsNullOrWhiteSpace($env:KLM_SPARKLE_PRIVATE_KEY)) {
+            Write-Host 'KLM_SPARKLE_PRIVATE_KEY is not configured; appcast generation skipped.'
+            exit 0
+          }
+          $env:KLM_UPDATE_DOWNLOAD_URL_PREFIX = `
+            "https://github.com/cloinse/klm/releases/download/v$Version"
+          $WinSparkleTool = Join-Path $env:USERPROFILE `
+            '.klm-tools\winsparkle-0.9.4\winsparkle-tool.exe'
+          & 'tool\generate_windows_appcast.ps1' `
+            -InstallerPath $Installer `
+            -OutputPath (Join-Path $OutputDirectory 'appcast-windows.xml') `
+            -Version $Version `
+            -Build $Build `
+            -WinSparkleTool $WinSparkleTool
 
     artifacts:
-      - build/windows/x64/runner/Kontakt-Library-Manager-Windows.zip
+      - build/windows/x64/runner/installer/*.exe
+      - build/windows/x64/runner/installer/*.sha256
+      - build/windows/x64/runner/installer/appcast-windows.xml

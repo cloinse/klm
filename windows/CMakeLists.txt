@@ -72,6 +72,15 @@ endif()
 set(INSTALL_BUNDLE_DATA_DIR "${CMAKE_INSTALL_PREFIX}/data")
 set(INSTALL_BUNDLE_LIB_DIR "${CMAKE_INSTALL_PREFIX}")
 
+# Codemagic places the hash-verified official SDK DLL here before configuring
+# CMake. Local debug builds remain usable when the optional updater is absent.
+set(KLM_WINSPARKLE_DLL
+  "${CMAKE_CURRENT_SOURCE_DIR}/runner/third_party/winsparkle/WinSparkle.dll")
+if(EXISTS "${KLM_WINSPARKLE_DLL}")
+  install(FILES "${KLM_WINSPARKLE_DLL}"
+    DESTINATION "${INSTALL_BUNDLE_LIB_DIR}" COMPONENT Runtime)
+endif()
+
 install(TARGETS ${BINARY_NAME} RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}"
   COMPONENT Runtime)
 
