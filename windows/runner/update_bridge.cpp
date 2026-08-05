@@ -35,6 +35,9 @@ std::wstring ExecutableDirectory() {
 #define KLM_STRINGIFY(value) KLM_STRINGIFY_INNER(value)
 #define KLM_WIDEN_INNER(value) L##value
 #define KLM_WIDEN(value) KLM_WIDEN_INNER(value)
+#define KLM_DISPLAY_VERSION                                                   \
+  KLM_STRINGIFY(FLUTTER_VERSION_MAJOR) "." KLM_STRINGIFY(                   \
+      FLUTTER_VERSION_MINOR) "." KLM_STRINGIFY(FLUTTER_VERSION_PATCH)
 
 }  // namespace
 
@@ -98,7 +101,7 @@ bool UpdateBridge::LoadWinSparkle() {
 
   set_appcast_url(kFeedUrl);
   set_app_details(L"Juan Ayala", L"Kontakt Library Manager",
-                  KLM_WIDEN(FLUTTER_VERSION));
+                  KLM_WIDEN(KLM_DISPLAY_VERSION));
   set_build_version(KLM_WIDEN(KLM_STRINGIFY(FLUTTER_VERSION_BUILD)));
   set_automatic_checks(0);
   instance_ = this;
@@ -114,7 +117,7 @@ void UpdateBridge::HandleMethodCall(
   if (call.method_name() == "getInfo") {
     flutter::EncodableMap payload;
     payload[flutter::EncodableValue("currentVersion")] =
-        flutter::EncodableValue(FLUTTER_VERSION);
+        flutter::EncodableValue(KLM_DISPLAY_VERSION);
     payload[flutter::EncodableValue("currentBuild")] =
         flutter::EncodableValue(KLM_STRINGIFY(FLUTTER_VERSION_BUILD));
     payload[flutter::EncodableValue("configured")] =

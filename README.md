@@ -5,7 +5,7 @@ Kontakt en macOS y Windows.
 
 ## Estado actual
 
-El inventario y los diagnósticos son funcionales en modo de lectura:
+El inventario y los diagnósticos son funcionales en ambas plataformas:
 
 - Usa inglés de forma predeterminada y permite seleccionar español o portugués
   de Brasil desde Settings. La selección se aplica inmediatamente y se guarda.
@@ -20,16 +20,16 @@ El inventario y los diagnósticos son funcionales en modo de lectura:
 - Se centra exclusivamente en el navegador clásico de Kontakt. Lee el orden
   `UserListIndex`, permite reorganizar librerías mediante arrastre y guarda los
   cambios en las preferencias del usuario sin autorización administrativa.
-- Incluye el adaptador Windows para XML y JSON. El Registro permanece
-  deliberadamente deshabilitado hasta validar sus vistas de 32/64 bits en una
-  máquina Windows con Kontakt instalado.
+- En Windows reconcilia XML, JSON y las vistas de 32/64 bits del Registro. Las
+  altas, reparaciones, reubicaciones y eliminaciones se ejecutan mediante un
+  helper puntual que solicita UAC únicamente al confirmar cada cambio.
 
-La segunda fase agrega los flujos de alta individual y por lote, reparación,
-reubicación y eliminación exclusiva de registros. En macOS se canalizan a un
-ejecutable nativo incluido dentro de la aplicación. Al confirmar un cambio,
-macOS muestra su diálogo normal de administrador, ejecuta una sola transacción
-y cierra el componente inmediatamente. La app Flutter no se ejecuta como
-administrador y el helper no acepta rutas de destino arbitrarias.
+Los flujos de alta individual y por lote, reparación, reubicación y eliminación
+exclusiva de registros se canalizan a componentes incluidos con la aplicación.
+Al confirmar un cambio, el sistema muestra su diálogo normal de administrador,
+ejecuta una sola transacción y cierra el componente inmediatamente. La app
+Flutter no se ejecuta como administrador y los helpers no aceptan rutas de
+destino arbitrarias.
 
 Ni la aplicación ni el helper son procesos residentes. No se instala ningún
 LaunchDaemon, servicio XPC, Ítem de inicio ni componente de fondo. La aplicación
@@ -83,7 +83,7 @@ lib/
   features/libraries/        controlador e interfaz principal
   platform/                  contrato común y ensamblador de inventario
   platform/macos/            XML, PLIST y JSON de macOS
-  platform/windows/          XML y JSON de Windows
+  platform/windows/          XML, JSON y Registro de Windows
 ```
 
 El navegador moderno, los mosaicos NKS y la base de datos `komplete.db3` quedan

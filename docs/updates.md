@@ -22,9 +22,10 @@ schedule background checks.
 - The Kontakt administrator helper remains independent from Sparkle and
   Flutter frameworks.
 - Every distributed build uses the single signed legacy appcast.
-- Windows is distributed as one Inno Setup executable. It installs per user in
-  `%LOCALAPPDATA%\Programs\Kontakt Library Manager`, so ordinary installation
-  and OTA updates do not require UAC.
+- Windows is distributed as one Inno Setup executable. It installs in Program
+  Files so the bundled one-shot registry helper cannot be replaced by an
+  unprivileged process. Installation and OTA replacement request UAC; KLM
+  itself continues to run without elevation.
 - WinSparkle validates the installer with the same EdDSA key used by Sparkle on
   macOS. The native updater closes KLM before Inno Setup replaces its files.
 - The Codemagic Windows workflow pins and verifies WinSparkle 0.9.4 and Inno
@@ -68,4 +69,4 @@ updates/appcast-windows.xml
 
 Commit the appcast without editing it. Existing Windows installations will
 then show the same persistent in-app update notice used on macOS. Clicking it
-opens WinSparkle, which verifies, downloads, and runs the per-user installer.
+opens WinSparkle, which verifies, downloads, and runs the installer.

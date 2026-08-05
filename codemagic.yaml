@@ -245,6 +245,18 @@ workflows:
         script: |
           $ErrorActionPreference = 'Stop'
 
+          $HelperSmokeResponse = Join-Path $env:TEMP 'klm-helper-smoke.json'
+          Remove-Item $HelperSmokeResponse -Force -ErrorAction SilentlyContinue
+          & powershell.exe -NoLogo -NoProfile -NonInteractive `
+            -ExecutionPolicy Bypass `
+            -File 'windows\runner\KontaktLibraryHelper.ps1' `
+            -Mode inventory -ResponsePath $HelperSmokeResponse
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path $HelperSmokeResponse)) {
+            throw 'Windows registry helper smoke test failed.'
+          }
+          Get-Content $HelperSmokeResponse -Raw | ConvertFrom-Json | Out-Null
+          Remove-Item $HelperSmokeResponse -Force
+
           $ToolsRoot = Join-Path $env:USERPROFILE '.klm-tools'
           New-Item -ItemType Directory -Force -Path $ToolsRoot | Out-Null
           $WinSparkleRoot = Join-Path $ToolsRoot 'winsparkle-0.9.4'

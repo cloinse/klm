@@ -39,7 +39,7 @@ class MacOSAppUpdatePlatform implements AppUpdatePlatform {
   Future<AppUpdateInfo> getInfo() async {
     final result = await _channel.invokeMapMethod<String, Object?>('getInfo');
     return AppUpdateInfo(
-      currentVersion: result?['currentVersion'] as String? ?? '',
+      currentVersion: visibleAppVersion(result?['currentVersion']),
       currentBuild: result?['currentBuild'] as String? ?? '',
       configured: result?['configured'] as bool? ?? false,
     );
@@ -67,7 +67,7 @@ class WindowsAppUpdatePlatform implements AppUpdatePlatform {
   Future<AppUpdateInfo> getInfo() async {
     final result = await _channel.invokeMapMethod<String, Object?>('getInfo');
     return AppUpdateInfo(
-      currentVersion: result?['currentVersion'] as String? ?? '',
+      currentVersion: visibleAppVersion(result?['currentVersion']),
       currentBuild: result?['currentBuild'] as String? ?? '',
       configured: result?['configured'] as bool? ?? false,
     );
@@ -109,6 +109,9 @@ class WindowsAppUpdatePlatform implements AppUpdatePlatform {
 }
 
 const _sparkleNamespace = 'http://www.andymatuschak.org/xml-namespaces/sparkle';
+
+String visibleAppVersion(Object? value) =>
+    (value as String? ?? '').trim().split('+').first;
 
 bool windowsAppcastHasNewerUpdate(
   String appcast, {

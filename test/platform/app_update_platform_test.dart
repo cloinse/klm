@@ -29,6 +29,11 @@ void main() {
     );
   });
 
+  test('visible version omits Flutter internal build number', () {
+    expect(visibleAppVersion('0.1.3+4'), '0.1.3');
+    expect(visibleAppVersion(' 0.1.3 '), '0.1.3');
+  });
+
   test('Windows appcast ignores the current build', () {
     expect(
       windowsAppcastHasNewerUpdate(
