@@ -253,9 +253,10 @@ workflows:
           if (-not (Test-Path $WinSparkleDll) -or
               -not (Test-Path $WinSparkleTool)) {
             $WinSparkleArchive = Join-Path $env:TEMP 'WinSparkle-0.9.4.zip'
-            Invoke-WebRequest `
-              'https://github.com/vslavik/winsparkle/releases/download/v0.9.4/WinSparkle-0.9.4.zip' `
-              -OutFile $WinSparkleArchive
+            & curl.exe --fail --location --silent --show-error --retry 3 `
+              --output $WinSparkleArchive `
+              'https://github.com/vslavik/winsparkle/releases/download/v0.9.4/WinSparkle-0.9.4.zip'
+            if ($LASTEXITCODE -ne 0) { throw 'WinSparkle download failed.' }
             $ActualHash = (Get-FileHash $WinSparkleArchive -Algorithm SHA256).Hash.ToLower()
             if ($ActualHash -ne '6037df37fc263bd1650a1c4949681a9d40ffe991d01f35892a406cb5d103c976') {
               throw 'WinSparkle archive checksum mismatch.'
@@ -263,7 +264,11 @@ workflows:
             Remove-Item $WinSparkleRoot -Recurse -Force -ErrorAction SilentlyContinue
             $ExtractRoot = Join-Path $env:TEMP 'klm-winsparkle-extract'
             Remove-Item $ExtractRoot -Recurse -Force -ErrorAction SilentlyContinue
-            Expand-Archive $WinSparkleArchive -DestinationPath $ExtractRoot
+            New-Item -ItemType Directory -Force -Path $ExtractRoot | Out-Null
+            & 7z x -y "-o$ExtractRoot" $WinSparkleArchive `
+              'WinSparkle-0.9.4\x64\Release\WinSparkle.dll' `
+              'WinSparkle-0.9.4\bin\winsparkle-tool.exe'
+            if ($LASTEXITCODE -ne 0) { throw 'WinSparkle extraction failed.' }
             New-Item -ItemType Directory -Force -Path $WinSparkleRoot | Out-Null
             $ExtractedSdk = Join-Path $ExtractRoot 'WinSparkle-0.9.4'
             Copy-Item (Join-Path $ExtractedSdk 'x64\Release\WinSparkle.dll') `
@@ -276,18 +281,30 @@ workflows:
           $InnoCompiler = Join-Path $InnoRoot 'ISCC.exe'
           if (-not (Test-Path $InnoCompiler)) {
             $InnoInstaller = Join-Path $env:TEMP 'innosetup-7.0.2-x64.exe'
-            Invoke-WebRequest `
-              'https://github.com/jrsoftware/issrc/releases/download/is-7_0_2/innosetup-7.0.2-x64.exe' `
-              -OutFile $InnoInstaller
+            & curl.exe --fail --location --silent --show-error --retry 3 `
+              --output $InnoInstaller `
+              'https://github.com/jrsoftware/issrc/releases/download/is-7_0_2/innosetup-7.0.2-x64.exe'
+            if ($LASTEXITCODE -ne 0) { throw 'Inno Setup download failed.' }
             $ActualHash = (Get-FileHash $InnoInstaller -Algorithm SHA256).Hash.ToLower()
             if ($ActualHash -ne '5ad54ca3def786f8f4212552e54cc6d8d61329e2d24a1cfee0571d42c2684ff1') {
               throw 'Inno Setup installer checksum mismatch.'
             }
             New-Item -ItemType Directory -Force -Path $InnoRoot | Out-Null
-            & $InnoInstaller /VERYSILENT /SUPPRESSMSGBOXES /NORESTART `
-              /CURRENTUSER "/DIR=$InnoRoot"
-            if ($LASTEXITCODE -ne 0 -or -not (Test-Path $InnoCompiler)) {
-              throw 'Inno Setup installation failed.'
+            $InnoLog = Join-Path $env:TEMP 'klm-inno-install.log'
+            $InnoProcess = Start-Process -FilePath $InnoInstaller `
+              -ArgumentList @(
+                '/VERYSILENT',
+                '/SUPPRESSMSGBOXES',
+                '/NORESTART',
+                '/CURRENTUSER',
+                "/DIR=$InnoRoot",
+                "/LOG=$InnoLog"
+              ) `
+              -Wait -PassThru
+            if ($InnoProcess.ExitCode -ne 0 -or
+                -not (Test-Path $InnoCompiler)) {
+              if (Test-Path $InnoLog) { Get-Content $InnoLog -Tail 80 }
+              throw "Inno Setup installation failed with exit code $($InnoProcess.ExitCode)."
             }
           }
 
