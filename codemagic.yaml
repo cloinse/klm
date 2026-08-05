@@ -344,7 +344,7 @@ workflows:
           if ($LASTEXITCODE -ne 0) { throw 'Inno Setup compilation failed.' }
 
           $Installer = Join-Path $OutputDirectory `
-            "Kontakt-Library-Manager-Windows-v$Version-Setup.exe"
+            "klm-windows-v$Version.exe"
           if (-not (Test-Path $Installer)) { throw 'Installer was not created.' }
           $InstallerHash = (Get-FileHash $Installer -Algorithm SHA256).Hash.ToLower()
           $HashPath = "$Installer.sha256"
