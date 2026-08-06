@@ -27,7 +27,8 @@ schedule background checks.
   unprivileged process. Installation and OTA replacement request UAC; KLM
   itself continues to run without elevation.
 - WinSparkle validates the installer with the same EdDSA key used by Sparkle on
-  macOS. The native updater closes KLM before Inno Setup replaces its files.
+  macOS. The native updater closes KLM before Inno Setup replaces its files,
+  then the installer relaunches KLM with the original non-elevated user.
 - The Codemagic Windows workflow pins and verifies WinSparkle 0.9.4 and Inno
   Setup 7.0.2, and caches both tools between builds.
 

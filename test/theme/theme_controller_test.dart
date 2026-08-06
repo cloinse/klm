@@ -35,10 +35,14 @@ void main() {
     );
     expect(
       _contrastRatio(
-        KlmColors.light.navigationSelectedBackground,
+        KlmColors.light.navigationSelectedBorder,
         KlmColors.light.sidebar,
       ),
       greaterThanOrEqualTo(3),
+    );
+    expect(
+      KlmColors.light.navigationSelectedBackground.computeLuminance(),
+      greaterThan(0.5),
     );
   });
 }
