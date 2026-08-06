@@ -225,8 +225,9 @@ workflows:
     environment:
       groups:
         - klm_secrets
-      # Use the Flutter SDK already present on the Windows image. Asking for
-      # "stable" makes Codemagic install another SDK on every fresh machine.
+      # The preinstalled Windows SDK is Flutter 3.19/Dart 3.3 and cannot build
+      # this project. Keep Windows on the same verified toolchain as macOS.
+      flutter: 3.38.9
 
     cache:
       cache_paths:
@@ -240,11 +241,7 @@ workflows:
         script: |
           flutter --version
           flutter config --enable-windows-desktop
-          flutter pub get --offline
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host 'Package cache is incomplete; resolving online once.'
-            flutter pub get
-          }
+          flutter pub get
           if ($LASTEXITCODE -ne 0) { throw 'Flutter dependency resolution failed.' }
 
       - name: Prepare verified Windows packaging tools
