@@ -239,6 +239,9 @@ workflows:
     scripts:
       - name: Install Flutter dependencies
         script: |
+          if ([string]::IsNullOrWhiteSpace($env:KLM_SPARKLE_PRIVATE_KEY)) {
+            throw 'KLM_SPARKLE_PRIVATE_KEY is required for the Windows release package.'
+          }
           flutter --version
           flutter config --enable-windows-desktop
           flutter pub get
@@ -345,10 +348,12 @@ workflows:
             throw 'The release bundle does not contain WinSparkle.dll.'
           }
 
-          $OutputDirectory = $env:CM_BUILD_DIR
-          Get-ChildItem -Path $OutputDirectory -File `
-            -Filter 'klm-windows-v*.exe' -ErrorAction SilentlyContinue | `
-            Remove-Item -Force
+          $PackageName = "klm-windows-v$Version"
+          $StagingDirectory = Join-Path $env:CM_BUILD_DIR 'windows-release'
+          $OutputDirectory = Join-Path $StagingDirectory $PackageName
+          Remove-Item $StagingDirectory -Recurse -Force `
+            -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
           $InnoCompiler = Join-Path $env:USERPROFILE `
             '.klm-tools\inno-7.0.2\ISCC.exe'
           & $InnoCompiler `
@@ -362,29 +367,59 @@ workflows:
           $Installer = Join-Path $OutputDirectory `
             "klm-windows-v$Version.exe"
           if (-not (Test-Path $Installer)) { throw 'Installer was not created.' }
-          $PublishedInstallers = @(
-            Get-ChildItem -Path $OutputDirectory -File `
-              -Filter 'klm-windows-v*.exe'
-          )
-          if ($PublishedInstallers.Count -ne 1 -or
-              $PublishedInstallers[0].Name -ne "klm-windows-v$Version.exe") {
-            throw 'Exactly one correctly named Windows installer is required.'
-          }
 
-          if ([string]::IsNullOrWhiteSpace($env:KLM_SPARKLE_PRIVATE_KEY)) {
-            Write-Host 'KLM_SPARKLE_PRIVATE_KEY is not configured; appcast generation skipped.'
-            exit 0
-          }
+          $InstallerHash = (Get-FileHash $Installer -Algorithm SHA256).Hash.ToLower()
+          $HashPath = "$Installer.sha256"
+          [IO.File]::WriteAllText(
+            $HashPath,
+            "$InstallerHash  $([IO.Path]::GetFileName($Installer))`n",
+            [Text.UTF8Encoding]::new($false)
+          )
+
           $env:KLM_UPDATE_DOWNLOAD_URL_PREFIX = `
             "https://github.com/cloinse/klm/releases/download/v$Version"
           $WinSparkleTool = Join-Path $env:USERPROFILE `
             '.klm-tools\winsparkle-0.9.4\winsparkle-tool.exe'
+          $Appcast = Join-Path $OutputDirectory 'appcast-windows.xml'
           & 'tool\generate_windows_appcast.ps1' `
             -InstallerPath $Installer `
-            -OutputPath (Join-Path $env:TEMP 'appcast-windows.xml') `
+            -OutputPath $Appcast `
             -Version $Version `
             -Build $Build `
             -WinSparkleTool $WinSparkleTool
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path $Appcast)) {
+            throw 'The signed Windows appcast was not created.'
+          }
+
+          $ExpectedFiles = @(
+            'appcast-windows.xml',
+            "klm-windows-v$Version.exe",
+            "klm-windows-v$Version.exe.sha256"
+          ) | Sort-Object
+          $ActualFiles = @(
+            Get-ChildItem -Path $OutputDirectory -File |
+              Select-Object -ExpandProperty Name
+          ) | Sort-Object
+          $UnexpectedFiles = @(
+            Compare-Object -ReferenceObject $ExpectedFiles `
+              -DifferenceObject $ActualFiles
+          )
+          if ($ActualFiles.Count -ne 3 -or $UnexpectedFiles.Count -ne 0) {
+            throw 'The Windows release folder must contain exactly three files.'
+          }
+
+          $Archive = Join-Path $env:CM_BUILD_DIR "$PackageName.zip"
+          Remove-Item $Archive -Force -ErrorAction SilentlyContinue
+          Push-Location $StagingDirectory
+          try {
+            & 7z a -tzip -mx=0 $Archive $PackageName
+            if ($LASTEXITCODE -ne 0) { throw 'Release archive creation failed.' }
+          } finally {
+            Pop-Location
+          }
+          if (-not (Test-Path $Archive)) {
+            throw 'The Windows release archive was not created.'
+          }
 
     artifacts:
-      - klm-windows-v*.exe
+      - klm-windows-v*.zip

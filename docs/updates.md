@@ -59,9 +59,10 @@ then discover the new release through Sparkle.
 
 1. Increase the version and build number in `pubspec.yaml`.
 2. Run the `windows-release` Codemagic workflow.
-3. Publish the generated setup executable and SHA-256 file in the matching
-   GitHub Release.
-4. Copy the generated `appcast-windows.xml` artifact to:
+3. Download `klm-windows-vX.Y.Z.zip`. It contains one folder with exactly the
+   setup executable, its SHA-256 file, and `appcast-windows.xml`.
+4. Publish the setup executable and SHA-256 file in the matching GitHub Release.
+5. Copy the generated `appcast-windows.xml` to:
 
 ```text
 updates/appcast-windows.xml
