@@ -19,7 +19,8 @@ El inventario y los diagnósticos son funcionales en ambas plataformas:
 - Conserva un registro de operaciones y errores durante la sesión.
 - Se centra exclusivamente en el navegador clásico de Kontakt. Lee el orden
   `UserListIndex`, permite reorganizar librerías mediante arrastre y guarda los
-  cambios en las preferencias del usuario sin autorización administrativa.
+  cambios en las preferencias del usuario de macOS o en `HKCU` de Windows sin
+  autorización administrativa.
 - En Windows reconcilia XML, JSON y las vistas de 32/64 bits del Registro. Las
   altas, reparaciones, reubicaciones y eliminaciones se ejecutan mediante un
   helper puntual que solicita UAC únicamente al confirmar cada cambio.

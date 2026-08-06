@@ -1,6 +1,6 @@
 param(
   [Parameter(Mandatory = $true)]
-  [ValidateSet('inventory', 'mutation')]
+  [ValidateSet('inventory', 'mutation', 'classicOrder')]
   [string]$Mode,
 
   [string]$RequestPath,
@@ -12,7 +12,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 2.0
-$script:SafeMutationResponsePath = $null
+$script:SafeRequestResponsePath = $null
 
 function Test-IsAdministrator {
   $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
@@ -109,9 +109,62 @@ function Get-RegistryValue {
   )
 }
 
+function Get-UserListIndexes {
+  $indexes = @{}
+  $views = @(
+    [Microsoft.Win32.RegistryView]::Registry64,
+    [Microsoft.Win32.RegistryView]::Registry32
+  )
+
+  foreach ($view in $views) {
+    $baseKey = $null
+    $nativeInstruments = $null
+    try {
+      $baseKey = [Microsoft.Win32.RegistryKey]::OpenBaseKey(
+        [Microsoft.Win32.RegistryHive]::CurrentUser,
+        $view
+      )
+      $nativeInstruments = $baseKey.OpenSubKey(
+        'SOFTWARE\Native Instruments',
+        $false
+      )
+      if ($null -eq $nativeInstruments) { continue }
+
+      foreach ($subKeyName in $nativeInstruments.GetSubKeyNames()) {
+        $productKey = $null
+        try {
+          $productKey = $nativeInstruments.OpenSubKey($subKeyName, $false)
+          if ($null -eq $productKey) { continue }
+          $rawIndex = Get-RegistryValue $productKey 'UserListIndex'
+          if ($null -eq $rawIndex) { continue }
+          $parsedIndex = 0
+          if (-not [int]::TryParse("$rawIndex", [ref]$parsedIndex)) { continue }
+
+          $identity = $subKeyName.Trim().ToLowerInvariant()
+          if ($identity -and -not $indexes.ContainsKey($identity)) {
+            $indexes[$identity] = $parsedIndex
+          }
+          $regKey = [string](Get-RegistryValue $productKey 'RegKey' '')
+          $regKeyIdentity = $regKey.Trim().ToLowerInvariant()
+          if ($regKeyIdentity -and -not $indexes.ContainsKey($regKeyIdentity)) {
+            $indexes[$regKeyIdentity] = $parsedIndex
+          }
+        } finally {
+          if ($null -ne $productKey) { $productKey.Dispose() }
+        }
+      }
+    } finally {
+      if ($null -ne $nativeInstruments) { $nativeInstruments.Dispose() }
+      if ($null -ne $baseKey) { $baseKey.Dispose() }
+    }
+  }
+  return $indexes
+}
+
 function Get-RegistryInventory {
   $records = New-Object System.Collections.Generic.List[object]
   $seen = @{}
+  $userListIndexes = Get-UserListIndexes
   $views = @(
     [Microsoft.Win32.RegistryView]::Registry64,
     [Microsoft.Win32.RegistryView]::Registry32
@@ -148,7 +201,18 @@ function Get-RegistryInventory {
           }
           $snpid = Get-RegistryValue $productKey 'SNPID'
           $contentPath = Get-RegistryValue $productKey 'ContentDir'
-          $userListIndex = Get-RegistryValue $productKey 'UserListIndex'
+          $userListIndex = $null
+          foreach ($candidate in @($regKey, $subKeyName)) {
+            $candidateIdentity = $candidate.Trim().ToLowerInvariant()
+            if ($candidateIdentity -and
+                $userListIndexes.ContainsKey($candidateIdentity)) {
+              $userListIndex = $userListIndexes[$candidateIdentity]
+              break
+            }
+          }
+          if ($null -eq $userListIndex) {
+            $userListIndex = Get-RegistryValue $productKey 'UserListIndex'
+          }
           if ($null -ne $snpid -and "$snpid".Trim()) {
             $record.snpid = "$snpid".Trim()
           }
@@ -228,10 +292,13 @@ function Get-ContentDirectory {
   return (Get-Item -LiteralPath $Value -Force).FullName
 }
 
-function Get-MutationTransportPaths {
+function Get-RequestTransportPaths {
   param(
     [Parameter(Mandatory = $true)] [string]$Request,
-    [Parameter(Mandatory = $true)] [string]$Response
+    [Parameter(Mandatory = $true)] [string]$Response,
+    [Parameter(Mandatory = $true)]
+    [ValidateSet('mutation', 'order')]
+    [string]$Kind
   )
 
   $requestFullPath = [System.IO.Path]::GetFullPath($Request)
@@ -252,7 +319,7 @@ function Get-MutationTransportPaths {
       (Split-Path -Parent $requestFullPath) -ine
         (Split-Path -Parent $responseFullPath) -or
       (Split-Path -Leaf (Split-Path -Parent $requestFullPath)) -notmatch
-        '^klm-mutation-[A-Za-z0-9_-]+$') {
+        "^klm-$Kind-[A-Za-z0-9_-]+$") {
     throw 'The mutation transport paths are invalid.'
   }
   Assert-NoReparsePoint (Split-Path -Parent $requestFullPath)
@@ -260,6 +327,43 @@ function Get-MutationTransportPaths {
     Request = $requestFullPath
     Response = $responseFullPath
   }
+}
+
+function Get-VerifiedRequest {
+  param(
+    [Parameter(Mandatory = $true)]
+    [ValidateSet('mutation', 'order')]
+    [string]$Kind
+  )
+
+  if (-not $RequestPath -or
+      -not $RequestSha256 -or
+      $RequestSha256 -notmatch '^[0-9a-fA-F]{64}$' -or
+      -not (Test-Path -LiteralPath $RequestPath -PathType Leaf)) {
+    throw 'The helper request is missing or invalid.'
+  }
+  $transport = Get-RequestTransportPaths $RequestPath $ResponsePath $Kind
+  $script:SafeRequestResponsePath = $transport.Response
+  $requestBytes = [System.IO.File]::ReadAllBytes($transport.Request)
+  if ($requestBytes.Length -gt 2500000) { throw 'The helper request is too large.' }
+  $sha256 = [System.Security.Cryptography.SHA256]::Create()
+  try {
+    $actualHash = [System.BitConverter]::ToString(
+      $sha256.ComputeHash($requestBytes)
+    ).Replace('-', '')
+  } finally {
+    $sha256.Dispose()
+  }
+  if ($actualHash -ine $RequestSha256) {
+    throw 'The helper request checksum does not match.'
+  }
+
+  $strictUtf8 = New-Object System.Text.UTF8Encoding($false, $true)
+  $request = ConvertFrom-Json -InputObject $strictUtf8.GetString($requestBytes)
+  if ((Get-ObjectProperty $request 'version') -ne 1) {
+    throw 'Unsupported helper request version.'
+  }
+  return $request
 }
 
 function Assert-NoReparsePoint {
@@ -366,12 +470,13 @@ function Set-AtomicUtf8File {
 
 function Get-RegistryBackup {
   param(
+    [Parameter(Mandatory = $true)] [Microsoft.Win32.RegistryHive]$Hive,
     [Parameter(Mandatory = $true)] [Microsoft.Win32.RegistryView]$View,
     [Parameter(Mandatory = $true)] [string]$RegKey
   )
 
   $baseKey = [Microsoft.Win32.RegistryKey]::OpenBaseKey(
-    [Microsoft.Win32.RegistryHive]::LocalMachine,
+    $Hive,
     $View
   )
   $key = $null
@@ -396,13 +501,14 @@ function Get-RegistryBackup {
 
 function Restore-RegistryBackup {
   param(
+    [Parameter(Mandatory = $true)] [Microsoft.Win32.RegistryHive]$Hive,
     [Parameter(Mandatory = $true)] [Microsoft.Win32.RegistryView]$View,
     [Parameter(Mandatory = $true)] [string]$RegKey,
     [Parameter(Mandatory = $true)] $Backup
   )
 
   $baseKey = [Microsoft.Win32.RegistryKey]::OpenBaseKey(
-    [Microsoft.Win32.RegistryHive]::LocalMachine,
+    $Hive,
     $View
   )
   try {
@@ -418,6 +524,87 @@ function Restore-RegistryBackup {
           }
         } finally {
           $key.Dispose()
+        }
+      }
+    } finally {
+      $nativeInstruments.Dispose()
+    }
+  } finally {
+    $baseKey.Dispose()
+  }
+}
+
+function Get-RegistryValuesBackup {
+  param(
+    [Parameter(Mandatory = $true)] [Microsoft.Win32.RegistryHive]$Hive,
+    [Parameter(Mandatory = $true)] [Microsoft.Win32.RegistryView]$View,
+    [Parameter(Mandatory = $true)] [string]$RegKey,
+    [Parameter(Mandatory = $true)] [string[]]$Names
+  )
+
+  $baseKey = [Microsoft.Win32.RegistryKey]::OpenBaseKey($Hive, $View)
+  $key = $null
+  try {
+    $key = $baseKey.OpenSubKey("SOFTWARE\Native Instruments\$RegKey", $false)
+    $backup = @{}
+    foreach ($name in $Names) {
+      $value = if ($null -eq $key) { $null } else {
+        Get-RegistryValue $key $name
+      }
+      $exists = $null -ne $key -and $key.GetValueNames() -contains $name
+      $backup[$name] = [pscustomobject]@{
+        Exists = $exists
+        Value = $value
+        Kind = if ($exists) { $key.GetValueKind($name) } else { $null }
+      }
+    }
+    return [pscustomobject]@{
+      KeyExisted = $null -ne $key
+      Values = $backup
+    }
+  } finally {
+    if ($null -ne $key) { $key.Dispose() }
+    $baseKey.Dispose()
+  }
+}
+
+function Restore-RegistryValuesBackup {
+  param(
+    [Parameter(Mandatory = $true)] [Microsoft.Win32.RegistryHive]$Hive,
+    [Parameter(Mandatory = $true)] [Microsoft.Win32.RegistryView]$View,
+    [Parameter(Mandatory = $true)] [string]$RegKey,
+    [Parameter(Mandatory = $true)] $Backup
+  )
+
+  $baseKey = [Microsoft.Win32.RegistryKey]::OpenBaseKey($Hive, $View)
+  try {
+    $nativeInstruments = $baseKey.CreateSubKey('SOFTWARE\Native Instruments')
+    try {
+      $key = $nativeInstruments.CreateSubKey($RegKey)
+      try {
+        foreach ($name in $Backup.Values.Keys) {
+          $entry = $Backup.Values[$name]
+          if ($entry.Exists) {
+            $key.SetValue($name, $entry.Value, $entry.Kind)
+          } else {
+            $key.DeleteValue($name, $false)
+          }
+        }
+      } finally {
+        $key.Dispose()
+      }
+      if (-not $Backup.KeyExisted) {
+        $createdKey = $nativeInstruments.OpenSubKey($RegKey, $false)
+        try {
+          if ($null -ne $createdKey -and
+              $createdKey.ValueCount -eq 0 -and
+              $createdKey.SubKeyCount -eq 0) {
+            $createdKey.Dispose()
+            $createdKey = $null
+            $nativeInstruments.DeleteSubKey($RegKey, $false)
+          }
+        } finally {
+          if ($null -ne $createdKey) { $createdKey.Dispose() }
         }
       }
     } finally {
@@ -468,32 +655,43 @@ function Set-RegistryRecord {
   }
 }
 
-function Invoke-Mutation {
-  if (-not $RequestPath -or
-      -not $RequestSha256 -or
-      $RequestSha256 -notmatch '^[0-9a-fA-F]{64}$' -or
-      -not (Test-Path -LiteralPath $RequestPath -PathType Leaf)) {
-    throw 'The mutation request is missing or invalid.'
-  }
-  $transport = Get-MutationTransportPaths $RequestPath $ResponsePath
-  $script:SafeMutationResponsePath = $transport.Response
-  $requestBytes = [System.IO.File]::ReadAllBytes($transport.Request)
-  if ($requestBytes.Length -gt 2500000) { throw 'The mutation request is too large.' }
-  $sha256 = [System.Security.Cryptography.SHA256]::Create()
-  try {
-    $actualHash = [System.BitConverter]::ToString(
-      $sha256.ComputeHash($requestBytes)
-    ).Replace('-', '')
-  } finally {
-    $sha256.Dispose()
-  }
-  if ($actualHash -ine $RequestSha256) { throw 'The mutation request checksum does not match.' }
+function Set-UserRegistryValues {
+  param(
+    [Parameter(Mandatory = $true)] [Microsoft.Win32.RegistryView]$View,
+    [Parameter(Mandatory = $true)] [string]$RegKey,
+    [Parameter(Mandatory = $true)] [hashtable]$Values
+  )
 
-  $strictUtf8 = New-Object System.Text.UTF8Encoding($false, $true)
-  $request = ConvertFrom-Json -InputObject $strictUtf8.GetString($requestBytes)
-  if ((Get-ObjectProperty $request 'version') -ne 1) {
-    throw 'Unsupported mutation request version.'
+  $baseKey = [Microsoft.Win32.RegistryKey]::OpenBaseKey(
+    [Microsoft.Win32.RegistryHive]::CurrentUser,
+    $View
+  )
+  try {
+    $nativeInstruments = $baseKey.CreateSubKey('SOFTWARE\Native Instruments')
+    try {
+      $key = $nativeInstruments.CreateSubKey($RegKey)
+      try {
+        foreach ($entry in $Values.GetEnumerator()) {
+          $kind = if ($entry.Key -in @('UserListIndex', 'browserLibsAZSort')) {
+            [Microsoft.Win32.RegistryValueKind]::DWord
+          } else {
+            [Microsoft.Win32.RegistryValueKind]::String
+          }
+          $key.SetValue($entry.Key, $entry.Value, $kind)
+        }
+      } finally {
+        $key.Dispose()
+      }
+    } finally {
+      $nativeInstruments.Dispose()
+    }
+  } finally {
+    $baseKey.Dispose()
   }
+}
+
+function Invoke-Mutation {
+  $request = Get-VerifiedRequest 'mutation'
   $operation = [string](Get-ObjectProperty $request 'operation')
   if ($operation -notin @('upsert', 'relocate', 'remove')) {
     throw 'Unknown mutation operation.'
@@ -569,7 +767,10 @@ function Invoke-Mutation {
   }
 
   $views = @([Microsoft.Win32.RegistryView]::Registry64)
-  $registry32 = Get-RegistryBackup ([Microsoft.Win32.RegistryView]::Registry32) $regKey
+  $registry32 = Get-RegistryBackup `
+    ([Microsoft.Win32.RegistryHive]::LocalMachine) `
+    ([Microsoft.Win32.RegistryView]::Registry32) `
+    $regKey
   if ($registry32.Exists) { $views += [Microsoft.Win32.RegistryView]::Registry32 }
   $fileBackups = @{}
   $registryBackups = @{}
@@ -593,7 +794,7 @@ function Invoke-Mutation {
       $registryBackups[$key] = if ($view -eq [Microsoft.Win32.RegistryView]::Registry32) {
         $registry32
       } else {
-        Get-RegistryBackup $view $regKey
+        Get-RegistryBackup ([Microsoft.Win32.RegistryHive]::LocalMachine) $view $regKey
       }
       Set-RegistryRecord $view $regKey $registryValues $removeRegistry
       $changedPaths.Add(
@@ -609,7 +810,11 @@ function Invoke-Mutation {
     foreach ($view in $views) {
       $key = "$view"
       if ($registryBackups.ContainsKey($key)) {
-        try { Restore-RegistryBackup $view $regKey $registryBackups[$key] } catch {}
+        try {
+          Restore-RegistryBackup `
+            ([Microsoft.Win32.RegistryHive]::LocalMachine) `
+            $view $regKey $registryBackups[$key]
+        } catch {}
       }
     }
     throw
@@ -622,13 +827,131 @@ function Invoke-Mutation {
   }
 }
 
+function Invoke-ClassicOrder {
+  $request = Get-VerifiedRequest 'order'
+  $rawEntries = @(Get-ObjectProperty $request 'entries')
+  if ($rawEntries.Count -gt 10000) {
+    throw 'The classic Kontakt order is too large.'
+  }
+
+  $kontaktIsRunning = @(
+    Get-Process -ErrorAction SilentlyContinue |
+      Where-Object { $_.ProcessName -match '^Kontakt(?:\s+\d+(?:\.\d+)*)?$' }
+  ).Count -gt 0
+  if ($kontaktIsRunning) {
+    throw 'Close Kontakt and any DAW using Kontakt before saving the classic library order.'
+  }
+
+  $entries = New-Object System.Collections.Generic.List[object]
+  $regKeys = @{}
+  $indexes = @{}
+  foreach ($rawEntry in $rawEntries) {
+    $regKey = Get-SafeComponent (Get-ObjectProperty $rawEntry 'regKey') 'RegKey'
+    $name = Get-SafeComponent (Get-ObjectProperty $rawEntry 'name') 'name'
+    $snpid = Get-OptionalSafeString (
+      Get-ObjectProperty $rawEntry 'snpid'
+    ) 'SNPID'
+    $index = 0
+    $rawIndex = Get-ObjectProperty $rawEntry 'userListIndex'
+    if (-not [int]::TryParse("$rawIndex", [ref]$index) -or
+        $index -lt 1 -or
+        $index -gt $rawEntries.Count) {
+      throw 'The classic Kontakt order contains an invalid index.'
+    }
+    $identity = $regKey.ToLowerInvariant()
+    if ($regKeys.ContainsKey($identity) -or $indexes.ContainsKey($index)) {
+      throw 'The classic Kontakt order contains duplicate values.'
+    }
+    $regKeys[$identity] = $true
+    $indexes[$index] = $true
+    $entries.Add([pscustomobject]@{
+      RegKey = $regKey
+      Name = $name
+      Snpid = $snpid
+      Index = $index
+    }) | Out-Null
+  }
+
+  $views = @(
+    [Microsoft.Win32.RegistryView]::Registry64,
+    [Microsoft.Win32.RegistryView]::Registry32
+  )
+  $applicationKeys = @('Kontakt', 'Kontakt 5', 'Kontakt 6', 'Kontakt 7', 'Kontakt 8')
+  $backups = New-Object System.Collections.Generic.List[object]
+  $changedPaths = New-Object System.Collections.Generic.List[string]
+  try {
+    foreach ($view in $views) {
+      foreach ($entry in $entries) {
+        $backup = Get-RegistryValuesBackup `
+          ([Microsoft.Win32.RegistryHive]::CurrentUser) `
+          $view $entry.RegKey @('UserListIndex', 'Name', 'RegKey', 'SNPID')
+        $backups.Add([pscustomobject]@{
+          View = $view
+          RegKey = $entry.RegKey
+          Backup = $backup
+        }) | Out-Null
+
+        $values = @{
+          UserListIndex = $entry.Index
+          Name = $entry.Name
+          RegKey = $entry.RegKey
+        }
+        if ($null -ne $entry.Snpid) { $values.SNPID = $entry.Snpid }
+        Set-UserRegistryValues $view $entry.RegKey $values
+
+        $verification = Get-RegistryValuesBackup `
+          ([Microsoft.Win32.RegistryHive]::CurrentUser) `
+          $view $entry.RegKey @('UserListIndex')
+        if (-not $verification.KeyExisted -or
+            -not $verification.Values.UserListIndex.Exists -or
+            ([int]$verification.Values.UserListIndex.Value) -ne $entry.Index) {
+          throw "The saved order for $($entry.Name) could not be verified."
+        }
+        $changedPaths.Add(
+          "HKCU [$view]\SOFTWARE\Native Instruments\$($entry.RegKey)"
+        ) | Out-Null
+      }
+
+      foreach ($applicationKey in $applicationKeys) {
+        $backup = Get-RegistryValuesBackup `
+          ([Microsoft.Win32.RegistryHive]::CurrentUser) `
+          $view $applicationKey @('browserLibsAZSort')
+        $backups.Add([pscustomobject]@{
+          View = $view
+          RegKey = $applicationKey
+          Backup = $backup
+        }) | Out-Null
+        Set-UserRegistryValues $view $applicationKey @{
+          browserLibsAZSort = 0
+        }
+      }
+    }
+  } catch {
+    for ($index = $backups.Count - 1; $index -ge 0; $index--) {
+      $backupEntry = $backups[$index]
+      try {
+        Restore-RegistryValuesBackup `
+          ([Microsoft.Win32.RegistryHive]::CurrentUser) `
+          $backupEntry.View $backupEntry.RegKey $backupEntry.Backup
+      } catch {}
+    }
+    throw
+  }
+
+  return [ordered]@{
+    operation = 'classicOrder'
+    libraryName = ''
+    changedPaths = $changedPaths.ToArray()
+  }
+}
+
 try {
   if ($Mode -eq 'inventory') {
     Write-JsonFile $ResponsePath (Get-RegistryInventory)
-  } else {
+  } elseif ($Mode -eq 'mutation') {
     if (-not (Test-IsAdministrator)) {
-      $transport = Get-MutationTransportPaths $RequestPath $ResponsePath
-      $script:SafeMutationResponsePath = $transport.Response
+      $transport = Get-RequestTransportPaths $RequestPath $ResponsePath 'mutation'
+      $script:SafeRequestResponsePath = $transport.Response
       $exitCode = Invoke-ElevatedMutation `
         -HelperPath $PSCommandPath `
         -Request $transport.Request `
@@ -637,18 +960,30 @@ try {
       exit $exitCode
     }
     $result = Invoke-Mutation
-    Write-JsonFile $script:SafeMutationResponsePath $result
+    Write-JsonFile $script:SafeRequestResponsePath $result
+  } else {
+    $result = Invoke-ClassicOrder
+    Write-JsonFile $script:SafeRequestResponsePath $result
   }
 } catch {
   try {
-    if ($Mode -eq 'inventory' -or $null -ne $script:SafeMutationResponsePath) {
+    if ($Mode -eq 'inventory' -or $null -ne $script:SafeRequestResponsePath) {
       $errorPath = if ($Mode -eq 'inventory') {
         $ResponsePath
       } else {
-        $script:SafeMutationResponsePath
+        $script:SafeRequestResponsePath
+      }
+      $errorCode = if ($Mode -eq 'classicOrder') {
+        if ($_.Exception.Message -like 'Close Kontakt*') {
+          'kontakt_running'
+        } else {
+          'classic_order_write_failed'
+        }
+      } else {
+        'mutation_failed'
       }
       Write-JsonFile $errorPath ([ordered]@{
-        errorCode = 'mutation_failed'
+        errorCode = $errorCode
         errorMessage = $_.Exception.Message
       })
     }

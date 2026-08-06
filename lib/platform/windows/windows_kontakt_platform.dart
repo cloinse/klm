@@ -31,7 +31,7 @@ class WindowsKontaktPlatform implements KontaktPlatform {
     canReadInventory: true,
     privilegedMutationsAvailable: true,
     registryLayoutVerified: true,
-    canManageClassicOrder: false,
+    canManageClassicOrder: true,
   );
 
   @override
@@ -226,8 +226,34 @@ class WindowsKontaktPlatform implements KontaktPlatform {
   }
 
   @override
-  Future<void> saveClassicLibraryOrder(List<KontaktLibrary> libraries) =>
-      _classicOrderUnsupported();
+  Future<void> saveClassicLibraryOrder(List<KontaktLibrary> libraries) async {
+    if (libraries.length > 10000) {
+      throw const FormatException('The classic Kontakt order is too large.');
+    }
+
+    final entries = <Map<String, Object>>[];
+    for (var index = 0; index < libraries.length; index++) {
+      final library = libraries[index];
+      final regKey = library.regKey ?? library.name;
+      if (!_isSafeRegistryComponent(regKey) ||
+          !_isSafeRegistryComponent(library.name)) {
+        throw FormatException('Unsafe Kontakt registry key: $regKey');
+      }
+      entries.add({
+        'regKey': regKey,
+        'name': library.name,
+        'snpid': ?library.snpid,
+        // Kontakt's classic browser stores positions as a one-based sequence.
+        'userListIndex': index + 1,
+      });
+    }
+
+    await _executeHelperRequest(
+      mode: 'classicOrder',
+      temporaryDirectoryPrefix: 'klm-order-',
+      request: {'version': 1, 'entries': entries},
+    );
+  }
 
   @override
   Future<List<KontaktLibraryCandidate>> chooseLibraryCandidates({
@@ -291,16 +317,29 @@ class WindowsKontaktPlatform implements KontaktPlatform {
   Future<KontaktMutationResult> _executeMutation(
     Map<String, Object> request,
   ) async {
+    final response = await _executeHelperRequest(
+      mode: 'mutation',
+      temporaryDirectoryPrefix: 'klm-mutation-',
+      request: request,
+    );
+    return KontaktMutationResult.fromMap(response);
+  }
+
+  Future<Map<String, dynamic>> _executeHelperRequest({
+    required String mode,
+    required String temporaryDirectoryPrefix,
+    required Map<String, Object> request,
+  }) async {
     final helper = _helperFile;
     if (!await helper.exists()) {
       throw PlatformException(
         code: 'helper_unavailable',
-        message: 'The Windows administrator helper is missing.',
+        message: 'The Windows helper is missing.',
       );
     }
 
     final temporaryDirectory = await Directory.systemTemp.createTemp(
-      'klm-mutation-',
+      temporaryDirectoryPrefix,
     );
     final requestFile = File(
       '${temporaryDirectory.path}${Platform.pathSeparator}request.json',
@@ -327,7 +366,7 @@ class WindowsKontaktPlatform implements KontaktPlatform {
         '-File',
         helper.path,
         '-Mode',
-        'mutation',
+        mode,
         '-RequestPath',
         requestFile.path,
         '-RequestSha256',
@@ -347,24 +386,31 @@ class WindowsKontaktPlatform implements KontaktPlatform {
           code: response?['errorCode'] as String? ?? 'authorization_cancelled',
           message:
               errorMessage ??
-              'The administrator operation was cancelled or failed.',
+              'The Windows helper operation was cancelled or failed.',
         );
       }
       if (response == null) {
         throw PlatformException(
           code: 'empty_helper_response',
-          message: 'The administrator helper returned no response.',
+          message: 'The Windows helper returned no response.',
         );
       }
-      return KontaktMutationResult.fromMap(response);
+      return response;
     } finally {
       await temporaryDirectory.delete(recursive: true);
     }
   }
 
-  Future<T> _classicOrderUnsupported<T>() {
-    throw UnsupportedError(
-      'Classic library ordering is not available on Windows.',
-    );
-  }
+  bool _isSafeRegistryComponent(String value) =>
+      value.isNotEmpty &&
+      value.length <= 255 &&
+      value != '.' &&
+      value != '..' &&
+      !value.endsWith('.') &&
+      !value.endsWith(' ') &&
+      !value.contains('/') &&
+      !value.contains('\\') &&
+      !value.contains('\u0000') &&
+      !value.contains('\n') &&
+      !value.contains('\r');
 }
