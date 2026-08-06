@@ -322,11 +322,17 @@ class WindowsKontaktPlatform implements KontaktPlatform {
         '-NoLogo',
         '-NoProfile',
         '-NonInteractive',
-        '-Command',
-        _elevatedHelperLauncher,
+        '-ExecutionPolicy',
+        'Bypass',
+        '-File',
         helper.path,
+        '-Mode',
+        'mutation',
+        '-RequestPath',
         requestFile.path,
+        '-RequestSha256',
         digest,
+        '-ResponsePath',
         responseFile.path,
       ]);
 
@@ -337,14 +343,11 @@ class WindowsKontaktPlatform implements KontaktPlatform {
       }
       final errorMessage = response?['errorMessage'] as String?;
       if (process.exitCode != 0 || errorMessage != null) {
-        final stderr = (process.stderr as String).trim();
         throw PlatformException(
           code: response?['errorCode'] as String? ?? 'authorization_cancelled',
           message:
               errorMessage ??
-              (stderr.isEmpty
-                  ? 'The administrator operation was cancelled or failed.'
-                  : stderr),
+              'The administrator operation was cancelled or failed.',
         );
       }
       if (response == null) {
@@ -358,21 +361,6 @@ class WindowsKontaktPlatform implements KontaktPlatform {
       await temporaryDirectory.delete(recursive: true);
     }
   }
-
-  static const _elevatedHelperLauncher = r'''
-$ErrorActionPreference = 'Stop'
-$helperArguments = @(
-  '-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
-  '-File', ('"' + $args[0] + '"'),
-  '-Mode', 'mutation',
-  '-RequestPath', ('"' + $args[1] + '"'),
-  '-RequestSha256', $args[2],
-  '-ResponsePath', ('"' + $args[3] + '"')
-)
-$elevated = Start-Process -FilePath 'powershell.exe' -Verb RunAs `
-  -ArgumentList $helperArguments -Wait -PassThru
-exit $elevated.ExitCode
-''';
 
   Future<T> _classicOrderUnsupported<T>() {
     throw UnsupportedError(

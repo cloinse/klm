@@ -14,6 +14,26 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 2.0
 $script:SafeMutationResponsePath = $null
 
+function Test-IsAdministrator {
+  $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+  try {
+    $principal = [System.Security.Principal.WindowsPrincipal]::new($identity)
+    return $principal.IsInRole(
+      [System.Security.Principal.WindowsBuiltInRole]::Administrator
+    )
+  } finally {
+    $identity.Dispose()
+  }
+}
+
+function ConvertTo-NativeQuotedArgument {
+  param([Parameter(Mandatory = $true)] [string]$Value)
+  if ([string]::IsNullOrWhiteSpace($Value) -or $Value.Contains('"')) {
+    throw 'An invalid helper argument was rejected.'
+  }
+  return '"' + $Value + '"'
+}
+
 function Write-JsonFile {
   param(
     [Parameter(Mandatory = $true)] [string]$Path,
@@ -32,6 +52,47 @@ function Write-JsonFile {
     $json,
     (New-Object System.Text.UTF8Encoding($false))
   )
+}
+
+function Invoke-ElevatedMutation {
+  param(
+    [Parameter(Mandatory = $true)] [string]$HelperPath,
+    [Parameter(Mandatory = $true)] [string]$Request,
+    [Parameter(Mandatory = $true)] [string]$RequestHash,
+    [Parameter(Mandatory = $true)] [string]$Response
+  )
+
+  $argumentLine = @(
+    '-NoLogo',
+    '-NoProfile',
+    '-NonInteractive',
+    '-ExecutionPolicy Bypass',
+    ('-File ' + (ConvertTo-NativeQuotedArgument $HelperPath)),
+    '-Mode mutation',
+    ('-RequestPath ' + (ConvertTo-NativeQuotedArgument $Request)),
+    ('-RequestSha256 ' + (ConvertTo-NativeQuotedArgument $RequestHash)),
+    ('-ResponsePath ' + (ConvertTo-NativeQuotedArgument $Response))
+  ) -join ' '
+
+  try {
+    $elevated = Start-Process -FilePath 'powershell.exe' -Verb RunAs `
+      -ArgumentList $argumentLine -Wait -PassThru
+  } catch {
+    Write-JsonFile $Response ([ordered]@{
+      errorCode = 'authorization_cancelled'
+      errorMessage = 'Administrator approval was cancelled or could not be started.'
+    })
+    return 1
+  }
+
+  if ($elevated.ExitCode -ne 0 -and
+      -not (Test-Path -LiteralPath $Response -PathType Leaf)) {
+    Write-JsonFile $Response ([ordered]@{
+      errorCode = 'mutation_failed'
+      errorMessage = 'The administrator operation failed.'
+    })
+  }
+  return $elevated.ExitCode
 }
 
 function Get-RegistryValue {
@@ -565,6 +626,16 @@ try {
   if ($Mode -eq 'inventory') {
     Write-JsonFile $ResponsePath (Get-RegistryInventory)
   } else {
+    if (-not (Test-IsAdministrator)) {
+      $transport = Get-MutationTransportPaths $RequestPath $ResponsePath
+      $script:SafeMutationResponsePath = $transport.Response
+      $exitCode = Invoke-ElevatedMutation `
+        -HelperPath $PSCommandPath `
+        -Request $transport.Request `
+        -RequestHash $RequestSha256 `
+        -Response $transport.Response
+      exit $exitCode
+    }
     $result = Invoke-Mutation
     Write-JsonFile $script:SafeMutationResponsePath $result
   }
