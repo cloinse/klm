@@ -225,11 +225,12 @@ workflows:
     environment:
       groups:
         - klm_secrets
-      flutter: stable
+      # Use the Flutter SDK already present on the Windows image. Asking for
+      # "stable" makes Codemagic install another SDK on every fresh machine.
 
     cache:
       cache_paths:
-        - ~/.pub-cache
+        - $FLUTTER_ROOT/.pub-cache
         - $CM_BUILD_DIR/build/windows/x64
         - ~/.klm-tools/winsparkle-0.9.4
         - ~/.klm-tools/inno-7.0.2
@@ -239,7 +240,12 @@ workflows:
         script: |
           flutter --version
           flutter config --enable-windows-desktop
-          flutter pub get
+          flutter pub get --offline
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host 'Package cache is incomplete; resolving online once.'
+            flutter pub get
+          }
+          if ($LASTEXITCODE -ne 0) { throw 'Flutter dependency resolution failed.' }
 
       - name: Prepare verified Windows packaging tools
         script: |
@@ -342,9 +348,10 @@ workflows:
             throw 'The release bundle does not contain WinSparkle.dll.'
           }
 
-          $OutputDirectory = Join-Path $env:CM_BUILD_DIR `
-            'build\windows\x64\runner\installer'
-          New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
+          $OutputDirectory = $env:CM_BUILD_DIR
+          Get-ChildItem -Path $OutputDirectory -File `
+            -Filter 'klm-windows-v*.exe' -ErrorAction SilentlyContinue | `
+            Remove-Item -Force
           $InnoCompiler = Join-Path $env:USERPROFILE `
             '.klm-tools\inno-7.0.2\ISCC.exe'
           & $InnoCompiler `
@@ -358,13 +365,14 @@ workflows:
           $Installer = Join-Path $OutputDirectory `
             "klm-windows-v$Version.exe"
           if (-not (Test-Path $Installer)) { throw 'Installer was not created.' }
-          $InstallerHash = (Get-FileHash $Installer -Algorithm SHA256).Hash.ToLower()
-          $HashPath = "$Installer.sha256"
-          [IO.File]::WriteAllText(
-            $HashPath,
-            "$InstallerHash  $([IO.Path]::GetFileName($Installer))`n",
-            [Text.UTF8Encoding]::new($false)
+          $PublishedInstallers = @(
+            Get-ChildItem -Path $OutputDirectory -File `
+              -Filter 'klm-windows-v*.exe'
           )
+          if ($PublishedInstallers.Count -ne 1 -or
+              $PublishedInstallers[0].Name -ne "klm-windows-v$Version.exe") {
+            throw 'Exactly one correctly named Windows installer is required.'
+          }
 
           if ([string]::IsNullOrWhiteSpace($env:KLM_SPARKLE_PRIVATE_KEY)) {
             Write-Host 'KLM_SPARKLE_PRIVATE_KEY is not configured; appcast generation skipped.'
@@ -376,12 +384,10 @@ workflows:
             '.klm-tools\winsparkle-0.9.4\winsparkle-tool.exe'
           & 'tool\generate_windows_appcast.ps1' `
             -InstallerPath $Installer `
-            -OutputPath (Join-Path $OutputDirectory 'appcast-windows.xml') `
+            -OutputPath (Join-Path $env:TEMP 'appcast-windows.xml') `
             -Version $Version `
             -Build $Build `
             -WinSparkleTool $WinSparkleTool
 
     artifacts:
-      - build/windows/x64/runner/installer/*.exe
-      - build/windows/x64/runner/installer/*.sha256
-      - build/windows/x64/runner/installer/appcast-windows.xml
+      - klm-windows-v*.exe
