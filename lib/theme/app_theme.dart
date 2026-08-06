@@ -14,6 +14,9 @@ class KlmColors extends ThemeExtension<KlmColors> {
     required this.navigationSelectedBackground,
     required this.navigationSelectedForeground,
     required this.navigationSelectedBorder,
+    required this.accentButtonBackground,
+    required this.accentButtonForeground,
+    required this.accentButtonBorder,
     required this.secondaryText,
     required this.tertiaryText,
     required this.mutedIcon,
@@ -30,6 +33,9 @@ class KlmColors extends ThemeExtension<KlmColors> {
   final Color navigationSelectedBackground;
   final Color navigationSelectedForeground;
   final Color navigationSelectedBorder;
+  final Color accentButtonBackground;
+  final Color accentButtonForeground;
+  final Color accentButtonBorder;
   final Color secondaryText;
   final Color tertiaryText;
   final Color mutedIcon;
@@ -46,23 +52,29 @@ class KlmColors extends ThemeExtension<KlmColors> {
     navigationSelectedBackground: Color(0xFF312719),
     navigationSelectedForeground: Color(0xFFFFC65A),
     navigationSelectedBorder: Color(0xFF6F5626),
+    accentButtonBackground: Color(0xFF3A2D16),
+    accentButtonForeground: Color(0xFFF3C76B),
+    accentButtonBorder: Color(0xFF6B5124),
     secondaryText: Color(0xFF8995A3),
     tertiaryText: Color(0xFF6F7B89),
     mutedIcon: Color(0xFF8793A0),
   );
 
   static const light = KlmColors(
-    sidebar: Color(0xFFF0F3F7),
+    sidebar: Color(0xFFF6F7FA),
     card: Color(0xFFFFFFFF),
-    border: Color(0xFFD7DEE7),
+    border: Color(0xFFE3E7ED),
     control: Color(0xFFFFFFFF),
-    controlBorder: Color(0xFFCCD5E0),
+    controlBorder: Color(0xFFDDE3EA),
     iconTileStart: Color(0xFFE9EEF4),
     iconTileEnd: Color(0xFFDDE5EE),
     iconForeground: Color(0xFF536171),
-    navigationSelectedBackground: Color(0xFFF3CC73),
-    navigationSelectedForeground: Color(0xFF493000),
-    navigationSelectedBorder: Color(0xFF9C6500),
+    navigationSelectedBackground: Color(0xFFFFF7EA),
+    navigationSelectedForeground: Color(0xFF725B35),
+    navigationSelectedBorder: Color(0xFFE7C47E),
+    accentButtonBackground: Color(0xFFFFEFD0),
+    accentButtonForeground: Color(0xFF694718),
+    accentButtonBorder: Color(0xFFE7B65B),
     secondaryText: Color(0xFF5F6C7A),
     tertiaryText: Color(0xFF74808D),
     mutedIcon: Color(0xFF647180),
@@ -81,6 +93,9 @@ class KlmColors extends ThemeExtension<KlmColors> {
     Color? navigationSelectedBackground,
     Color? navigationSelectedForeground,
     Color? navigationSelectedBorder,
+    Color? accentButtonBackground,
+    Color? accentButtonForeground,
+    Color? accentButtonBorder,
     Color? secondaryText,
     Color? tertiaryText,
     Color? mutedIcon,
@@ -99,6 +114,11 @@ class KlmColors extends ThemeExtension<KlmColors> {
         navigationSelectedForeground ?? this.navigationSelectedForeground,
     navigationSelectedBorder:
         navigationSelectedBorder ?? this.navigationSelectedBorder,
+    accentButtonBackground:
+        accentButtonBackground ?? this.accentButtonBackground,
+    accentButtonForeground:
+        accentButtonForeground ?? this.accentButtonForeground,
+    accentButtonBorder: accentButtonBorder ?? this.accentButtonBorder,
     secondaryText: secondaryText ?? this.secondaryText,
     tertiaryText: tertiaryText ?? this.tertiaryText,
     mutedIcon: mutedIcon ?? this.mutedIcon,
@@ -129,6 +149,21 @@ class KlmColors extends ThemeExtension<KlmColors> {
       navigationSelectedBorder: Color.lerp(
         navigationSelectedBorder,
         other.navigationSelectedBorder,
+        t,
+      )!,
+      accentButtonBackground: Color.lerp(
+        accentButtonBackground,
+        other.accentButtonBackground,
+        t,
+      )!,
+      accentButtonForeground: Color.lerp(
+        accentButtonForeground,
+        other.accentButtonForeground,
+        t,
+      )!,
+      accentButtonBorder: Color.lerp(
+        accentButtonBorder,
+        other.accentButtonBorder,
         t,
       )!,
       secondaryText: Color.lerp(secondaryText, other.secondaryText, t)!,

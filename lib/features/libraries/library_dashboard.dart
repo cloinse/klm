@@ -494,9 +494,17 @@ class _InventoryView extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               FilledButton.icon(
+                key: const ValueKey('add-library-button'),
                 onPressed: controller.mutationInProgress
                     ? null
                     : () => _addLibraries(context, allowMultiple: false),
+                style: FilledButton.styleFrom(
+                  backgroundColor: context.klmColors.accentButtonBackground,
+                  foregroundColor: context.klmColors.accentButtonForeground,
+                  side: BorderSide(color: context.klmColors.accentButtonBorder),
+                  elevation: 0,
+                  shadowColor: Colors.transparent,
+                ),
                 icon: const Icon(Icons.add_rounded, size: 19),
                 label: Text(context.l10n.addLibrary),
               ),

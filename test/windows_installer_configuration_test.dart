@@ -15,4 +15,16 @@ void main() {
     expect(runEntry, contains('runasoriginaluser'));
     expect(runEntry, isNot(contains('skipifsilent')));
   });
+
+  test('WinSparkle installs immediately without an update choice dialog', () {
+    final updateBridge = File(
+      'windows/runner/update_bridge.cpp',
+    ).readAsStringSync();
+
+    expect(
+      updateBridge,
+      contains('win_sparkle_check_update_with_ui_and_install'),
+    );
+    expect(updateBridge, isNot(contains('"win_sparkle_check_update_with_ui"')));
+  });
 }

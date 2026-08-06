@@ -3,12 +3,90 @@ import Foundation
 import Sparkle
 
 @MainActor
+final class InstallOnlyUpdateUserDriver: NSObject, SPUUserDriver {
+  func show(
+    _ request: SPUUpdatePermissionRequest,
+    reply: @escaping (SUUpdatePermissionResponse) -> Void
+  ) {
+    reply(
+      SUUpdatePermissionResponse(
+        automaticUpdateChecks: false,
+        sendSystemProfile: false
+      )
+    )
+  }
+
+  func showUserInitiatedUpdateCheck(cancellation: @escaping () -> Void) {}
+
+  func showUpdateFound(
+    with appcastItem: SUAppcastItem,
+    state: SPUUserUpdateState,
+    reply: @escaping (SPUUserUpdateChoice) -> Void
+  ) {
+    reply(.install)
+  }
+
+  func showUpdateReleaseNotes(with downloadData: SPUDownloadData) {}
+
+  func showUpdateReleaseNotesFailedToDownloadWithError(_ error: Error) {}
+
+  func showUpdateNotFoundWithError(
+    _ error: Error,
+    acknowledgement: @escaping () -> Void
+  ) {
+    acknowledgement()
+  }
+
+  func showUpdaterError(
+    _ error: Error,
+    acknowledgement: @escaping () -> Void
+  ) {
+    acknowledgement()
+  }
+
+  func showDownloadInitiated(cancellation: @escaping () -> Void) {}
+
+  func showDownloadDidReceiveExpectedContentLength(
+    _ expectedContentLength: UInt64
+  ) {}
+
+  func showDownloadDidReceiveData(ofLength length: UInt64) {}
+
+  func showDownloadDidStartExtractingUpdate() {}
+
+  func showExtractionReceivedProgress(_ progress: Double) {}
+
+  func showReady(
+    toInstallAndRelaunch reply: @escaping (SPUUserUpdateChoice) -> Void
+  ) {
+    reply(.install)
+  }
+
+  func showInstallingUpdate(
+    withApplicationTerminated applicationTerminated: Bool,
+    retryTerminatingApplication: @escaping () -> Void
+  ) {}
+
+  func showUpdateInstalledAndRelaunched(
+    _ relaunched: Bool,
+    acknowledgement: @escaping () -> Void
+  ) {
+    acknowledgement()
+  }
+
+  func showUpdateInFocus() {}
+
+  func dismissUpdateInstallation() {}
+}
+
+@MainActor
 final class UpdateBridge: NSObject, SPUUpdaterDelegate {
   private static let channelName =
     "com.juanayala.kontaktLibraryManager/updates"
 
   private let channel: FlutterMethodChannel
-  private var updaterController: SPUStandardUpdaterController?
+  private let userDriver = InstallOnlyUpdateUserDriver()
+  private var updater: SPUUpdater?
   private var probeResult: FlutterResult?
 
   init(messenger: FlutterBinaryMessenger) {
@@ -17,24 +95,34 @@ final class UpdateBridge: NSObject, SPUUpdaterDelegate {
       binaryMessenger: messenger
     )
 
-    let feedURL = Bundle.main.object(
-      forInfoDictionaryKey: "SUFeedURL"
-    ) as? String ?? ""
-    let publicKey = Bundle.main.object(
-      forInfoDictionaryKey: "SUPublicEDKey"
-    ) as? String ?? ""
-    let configured = URL(string: feedURL)?.scheme == "https"
+    let feedURL =
+      Bundle.main.object(
+        forInfoDictionaryKey: "SUFeedURL"
+      ) as? String ?? ""
+    let publicKey =
+      Bundle.main.object(
+        forInfoDictionaryKey: "SUPublicEDKey"
+      ) as? String ?? ""
+    let configured =
+      URL(string: feedURL)?.scheme == "https"
       && !publicKey.isEmpty
       && !publicKey.contains("$(")
 
     super.init()
 
     if configured {
-      updaterController = SPUStandardUpdaterController(
-        startingUpdater: true,
-        updaterDelegate: self,
-        userDriverDelegate: nil
+      let updater = SPUUpdater(
+        hostBundle: .main,
+        applicationBundle: .main,
+        userDriver: userDriver,
+        delegate: self
       )
+      do {
+        try updater.start()
+        self.updater = updater
+      } catch {
+        self.updater = nil
+      }
     }
 
     channel.setMethodCallHandler { [weak self] call, result in
@@ -53,7 +141,7 @@ final class UpdateBridge: NSObject, SPUUpdaterDelegate {
       case "getInfo":
         result(self.infoPayload)
       case "probeForUpdates":
-        guard let updaterController = self.updaterController else {
+        guard let updater = self.updater else {
           result(false)
           return
         }
@@ -68,9 +156,9 @@ final class UpdateBridge: NSObject, SPUUpdaterDelegate {
           return
         }
         self.probeResult = result
-        updaterController.updater.checkForUpdateInformation()
+        updater.checkForUpdateInformation()
       case "checkForUpdates":
-        guard let updaterController = self.updaterController else {
+        guard let updater = self.updater else {
           result(
             FlutterError(
               code: "updater_not_configured",
@@ -80,7 +168,7 @@ final class UpdateBridge: NSObject, SPUUpdaterDelegate {
           )
           return
         }
-        updaterController.checkForUpdates(nil)
+        updater.checkForUpdates()
         result(nil)
       default:
         result(FlutterMethodNotImplemented)
@@ -122,16 +210,18 @@ final class UpdateBridge: NSObject, SPUUpdaterDelegate {
   }
 
   private var infoPayload: [String: Any] {
-    let version = Bundle.main.object(
-      forInfoDictionaryKey: "CFBundleShortVersionString"
-    ) as? String ?? ""
-    let build = Bundle.main.object(
-      forInfoDictionaryKey: "CFBundleVersion"
-    ) as? String ?? ""
+    let version =
+      Bundle.main.object(
+        forInfoDictionaryKey: "CFBundleShortVersionString"
+      ) as? String ?? ""
+    let build =
+      Bundle.main.object(
+        forInfoDictionaryKey: "CFBundleVersion"
+      ) as? String ?? ""
     return [
       "currentVersion": version,
       "currentBuild": build,
-      "configured": updaterController != nil,
+      "configured": updater != nil,
     ]
   }
 }

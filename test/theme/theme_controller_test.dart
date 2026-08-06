@@ -35,14 +35,41 @@ void main() {
     );
     expect(
       _contrastRatio(
+        KlmColors.light.navigationSelectedForeground,
+        KlmColors.light.sidebar,
+      ),
+      greaterThanOrEqualTo(4.5),
+    );
+    expect(
+      _contrastRatio(
         KlmColors.light.navigationSelectedBorder,
         KlmColors.light.sidebar,
       ),
-      greaterThanOrEqualTo(3),
+      lessThan(2),
     );
     expect(
-      KlmColors.light.navigationSelectedBackground.computeLuminance(),
-      greaterThan(0.5),
+      _contrastRatio(
+        KlmColors.light.accentButtonForeground,
+        KlmColors.light.accentButtonBackground,
+      ),
+      greaterThanOrEqualTo(4.5),
+    );
+  });
+
+  test('dark navigation and accent button colors remain readable', () {
+    expect(
+      _contrastRatio(
+        KlmColors.dark.navigationSelectedForeground,
+        KlmColors.dark.navigationSelectedBackground,
+      ),
+      greaterThanOrEqualTo(4.5),
+    );
+    expect(
+      _contrastRatio(
+        KlmColors.dark.accentButtonForeground,
+        KlmColors.dark.accentButtonBackground,
+      ),
+      greaterThanOrEqualTo(4.5),
     );
   });
 }

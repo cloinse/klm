@@ -44,7 +44,7 @@ class UpdateBridge {
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> channel_;
 
   VoidFunction cleanup_ = nullptr;
-  VoidFunction check_update_with_ui_ = nullptr;
+  VoidFunction check_update_with_ui_and_install_ = nullptr;
 };
 
 #endif  // RUNNER_UPDATE_BRIDGE_H_

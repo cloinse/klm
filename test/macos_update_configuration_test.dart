@@ -1,0 +1,29 @@
+import 'dart:io';
+
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  test('Sparkle uses an install-only user driver on macOS', () {
+    final updateBridge = File(
+      'macos/Runner/Native/UpdateBridge.swift',
+    ).readAsStringSync();
+
+    expect(updateBridge, contains('InstallOnlyUpdateUserDriver'));
+    expect(updateBridge, contains('reply(.install)'));
+    expect(updateBridge, isNot(contains('SPUStandardUpdaterController')));
+    expect(updateBridge, isNot(contains('reply(.dismiss)')));
+    expect(updateBridge, isNot(contains('reply(.skip)')));
+  });
+
+  test('Codemagic packages exactly three macOS release files in one ZIP', () {
+    final codemagic = File('codemagic.yaml').readAsStringSync();
+
+    expect(
+      codemagic,
+      contains('KLM_PACKAGE_NAME="klm-macos-v\${KLM_VERSION}"'),
+    );
+    expect(codemagic, contains('test "\$KLM_FILE_COUNT" -eq 3'));
+    expect(codemagic, contains('- klm-macos-v*.zip'));
+    expect(codemagic, isNot(contains('- build/legacy/*.dmg')));
+  });
+}

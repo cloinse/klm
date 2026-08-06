@@ -93,8 +93,8 @@ bool UpdateBridge::LoadWinSparkle() {
                    &set_can_shutdown) &&
       LoadFunction(module_, "win_sparkle_set_shutdown_request_callback",
                    &set_shutdown) &&
-      LoadFunction(module_, "win_sparkle_check_update_with_ui",
-                   &check_update_with_ui_) &&
+      LoadFunction(module_, "win_sparkle_check_update_with_ui_and_install",
+                   &check_update_with_ui_and_install_) &&
       LoadFunction(module_, "win_sparkle_cleanup", &cleanup_) &&
       LoadFunction(module_, "win_sparkle_init", &init);
   if (!loaded || set_public_key(kPublicKey) != 1) return false;
@@ -126,12 +126,12 @@ void UpdateBridge::HandleMethodCall(
     return;
   }
   if (call.method_name() == "checkForUpdates") {
-    if (!configured_ || check_update_with_ui_ == nullptr) {
+    if (!configured_ || check_update_with_ui_and_install_ == nullptr) {
       result->Error("updater_not_configured",
                     "The update service is not configured.");
       return;
     }
-    check_update_with_ui_();
+    check_update_with_ui_and_install_();
     result->Success();
     return;
   }

@@ -184,13 +184,16 @@ workflows:
       - name: Package legacy DMG
         script: |
           set -euo pipefail
-          KLM_LEGACY_DIRECTORY="build/legacy"
           KLM_APP_PATH="build/macos/Build/Products/Release/${KLM_APP_NAME}.app"
           KLM_VERSION="$(/usr/libexec/PlistBuddy -c \
             'Print :CFBundleShortVersionString' \
             "$KLM_APP_PATH/Contents/Info.plist")"
-          KLM_DMG="$KLM_LEGACY_DIRECTORY/klm-macOS-v${KLM_VERSION}.dmg"
-          /bin/mkdir -p "$KLM_LEGACY_DIRECTORY"
+          KLM_PACKAGE_NAME="klm-macos-v${KLM_VERSION}"
+          KLM_STAGING_DIRECTORY="build/macos-release"
+          KLM_OUTPUT_DIRECTORY="$KLM_STAGING_DIRECTORY/$KLM_PACKAGE_NAME"
+          KLM_DMG="$KLM_OUTPUT_DIRECTORY/$KLM_PACKAGE_NAME.dmg"
+          /bin/rm -rf "$KLM_STAGING_DIRECTORY"
+          /bin/mkdir -p "$KLM_OUTPUT_DIRECTORY"
           KLM_PREPARE_APP=false \
             tool/package_macos_dmg.sh "$KLM_APP_PATH" "$KLM_DMG"
 
@@ -199,23 +202,50 @@ workflows:
           set -euo pipefail
           if test -z "${KLM_SPARKLE_PRIVATE_KEY:-}"; then
             /usr/bin/printf '%s\n' \
-              'KLM_SPARKLE_PRIVATE_KEY is not configured; appcast generation skipped.'
-            exit 0
+              'KLM_SPARKLE_PRIVATE_KEY is required for the macOS release package.' >&2
+            exit 1
           fi
 
           KLM_APP_PATH="build/macos/Build/Products/Release/${KLM_APP_NAME}.app"
           KLM_VERSION="$(/usr/libexec/PlistBuddy -c \
             'Print :CFBundleShortVersionString' \
             "$KLM_APP_PATH/Contents/Info.plist")"
+          KLM_PACKAGE_NAME="klm-macos-v${KLM_VERSION}"
+          KLM_OUTPUT_DIRECTORY="build/macos-release/$KLM_PACKAGE_NAME"
           export KLM_UPDATE_DOWNLOAD_URL_PREFIX="https://github.com/cloinse/klm/releases/download/v${KLM_VERSION}"
           tool/generate_macos_appcast.sh \
-            build/legacy \
-            build/legacy/appcast-macos-legacy.xml
+            "$KLM_OUTPUT_DIRECTORY" \
+            "$KLM_OUTPUT_DIRECTORY/appcast-macos-legacy.xml"
+
+      - name: Package macOS release archive
+        script: |
+          set -euo pipefail
+          KLM_APP_PATH="build/macos/Build/Products/Release/${KLM_APP_NAME}.app"
+          KLM_VERSION="$(/usr/libexec/PlistBuddy -c \
+            'Print :CFBundleShortVersionString' \
+            "$KLM_APP_PATH/Contents/Info.plist")"
+          KLM_PACKAGE_NAME="klm-macos-v${KLM_VERSION}"
+          KLM_STAGING_DIRECTORY="build/macos-release"
+          KLM_OUTPUT_DIRECTORY="$KLM_STAGING_DIRECTORY/$KLM_PACKAGE_NAME"
+          KLM_EXPECTED_DMG="$KLM_OUTPUT_DIRECTORY/$KLM_PACKAGE_NAME.dmg"
+          KLM_EXPECTED_HASH="$KLM_EXPECTED_DMG.sha256"
+          KLM_EXPECTED_APPCAST="$KLM_OUTPUT_DIRECTORY/appcast-macos-legacy.xml"
+
+          test -f "$KLM_EXPECTED_DMG"
+          test -f "$KLM_EXPECTED_HASH"
+          test -f "$KLM_EXPECTED_APPCAST"
+          KLM_FILE_COUNT="$(/usr/bin/find "$KLM_OUTPUT_DIRECTORY" \
+            -maxdepth 1 -type f | /usr/bin/wc -l | /usr/bin/tr -d ' ')"
+          test "$KLM_FILE_COUNT" -eq 3
+
+          KLM_ARCHIVE="$CM_BUILD_DIR/$KLM_PACKAGE_NAME.zip"
+          /bin/rm -f "$KLM_ARCHIVE"
+          cd "$KLM_STAGING_DIRECTORY"
+          /usr/bin/zip -r -0 "$KLM_ARCHIVE" "$KLM_PACKAGE_NAME"
+          test -f "$KLM_ARCHIVE"
 
     artifacts:
-      - build/legacy/*.dmg
-      - build/legacy/*.dmg.sha256
-      - build/legacy/appcast-macos-legacy.xml
+      - klm-macos-v*.zip
 
   windows-release:
     name: Kontakt Library Manager - Windows

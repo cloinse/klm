@@ -3,8 +3,9 @@
 KLM uses Sparkle 2 on macOS and WinSparkle on Windows with Ed25519 update
 signatures. KLM performs one silent update probe when it opens. If a new
 version exists, a persistent in-app notice lets the user start the secure
-download and installation flow. It runs only while KLM is open and does not
-schedule background checks.
+download and installation flow with one localized Install update action. The
+native updaters do not offer skip or remind-later choices. Update checks run
+only while KLM is open and do not use a background schedule.
 
 ## Distribution rules
 
@@ -14,9 +15,10 @@ schedule background checks.
   and an `Applications` link.
 - The layout metadata is generated without Finder or Apple Events, so the same
   visual installer can be built in headless Codemagic workers.
-- Codemagic names the distributable `klm-macOS-vX.Y.Z.dmg`; the application
-  inside remains `Kontakt Library Manager.app`. Release notes state macOS
-  10.15+ compatibility separately.
+- Codemagic publishes `klm-macos-vX.Y.Z.zip`, containing exactly the DMG, its
+  SHA-256 file, and `appcast-macos-legacy.xml`. The application inside the DMG
+  remains `Kontakt Library Manager.app`; release notes state macOS 10.15+
+  compatibility separately.
 - The packaging script creates a temporary Python environment with hash-pinned
   `dmgbuild` dependencies; nothing is installed globally on the build machine.
 - The Kontakt administrator helper remains independent from Sparkle and
@@ -46,8 +48,10 @@ commit or print this value.
 
 1. Increase the version and build number in `pubspec.yaml`.
 2. Run the `macos-catalina-legacy` Codemagic workflow.
-3. Publish its DMG and SHA-256 file in the matching GitHub Release.
-4. Copy the generated appcast artifact to:
+3. Download `klm-macos-vX.Y.Z.zip`. It contains one folder with exactly the
+   DMG, its SHA-256 file, and `appcast-macos-legacy.xml`.
+4. Publish the DMG and SHA-256 file in the matching GitHub Release.
+5. Copy the generated appcast to:
 
 ```text
 updates/appcast-macos-legacy.xml

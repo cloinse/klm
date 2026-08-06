@@ -101,7 +101,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Actualización disponible'), findsOneWidget);
-    expect(find.text('Descargar e instalar'), findsOneWidget);
+    expect(find.text('Instalar actualización'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('download-install-update')));
     await tester.pumpAndSettle();
@@ -219,6 +219,22 @@ void main() {
             .style
             ?.color,
         KlmColors.light.navigationSelectedForeground,
+      );
+
+      final addLibraryButton = tester.widget<FilledButton>(
+        find.byKey(const ValueKey('add-library-button')),
+      );
+      expect(
+        addLibraryButton.style?.backgroundColor?.resolve({}),
+        KlmColors.light.accentButtonBackground,
+      );
+      expect(
+        addLibraryButton.style?.foregroundColor?.resolve({}),
+        KlmColors.light.accentButtonForeground,
+      );
+      expect(
+        addLibraryButton.style?.side?.resolve({})?.color,
+        KlmColors.light.accentButtonBorder,
       );
 
       await tester.tap(find.byKey(const ValueKey('navigation-settings')));
