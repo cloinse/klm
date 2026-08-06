@@ -13,6 +13,8 @@ void main() {
     expect(updateBridge, isNot(contains('SPUStandardUpdaterController')));
     expect(updateBridge, isNot(contains('reply(.dismiss)')));
     expect(updateBridge, isNot(contains('reply(.skip)')));
+    expect(updateBridge, contains('case "installUpdate"'));
+    expect(updateBridge, contains('item.displayVersionString'));
   });
 
   test('Codemagic packages exactly three macOS release files in one ZIP', () {

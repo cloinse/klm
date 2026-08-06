@@ -125,7 +125,7 @@ void UpdateBridge::HandleMethodCall(
     result->Success(flutter::EncodableValue(payload));
     return;
   }
-  if (call.method_name() == "checkForUpdates") {
+  if (call.method_name() == "installUpdate") {
     if (!configured_ || check_update_with_ui_and_install_ == nullptr) {
       result->Error("updater_not_configured",
                     "The update service is not configured.");

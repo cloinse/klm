@@ -82,7 +82,9 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final localeController = LocaleController();
-    final updatePlatform = _FakeAppUpdatePlatform(updateAvailable: true);
+    final updatePlatform = _FakeAppUpdatePlatform(
+      availableUpdate: const AvailableAppUpdate(version: '1.1.0', build: '2'),
+    );
     addTearDown(localeController.dispose);
     await localeController.setLanguage(AppLanguage.spanish);
 
@@ -106,11 +108,89 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('download-install-update')));
     await tester.pumpAndSettle();
 
-    expect(updatePlatform.checkCount, 1);
+    expect(
+      find.byKey(const ValueKey('update-available-dialog')),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        'Kontakt Library Manager 1.1.0 ya está disponible '
+        '(tienes la versión 1.0.0).',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Recordármelo más tarde'), findsNothing);
+    expect(find.text('Omitir esta versión'), findsNothing);
+    expect(
+      tester
+          .widget<AlertDialog>(
+            find.byKey(const ValueKey('update-available-dialog')),
+          )
+          .actions,
+      hasLength(1),
+    );
+    expect(updatePlatform.installCount, 0);
+
+    await tester.tap(find.byKey(const ValueKey('confirm-install-update')));
+    await tester.pumpAndSettle();
+
+    expect(updatePlatform.installCount, 1);
     expect(
       find.byKey(const ValueKey('update-available-banner')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('Settings shows the same version dialog before installing', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final updatePlatform = _FakeAppUpdatePlatform(
+      availableUpdate: const AvailableAppUpdate(version: '1.1.0', build: '2'),
+    );
+
+    await tester.pumpWidget(
+      KontaktLibraryManagerApp(
+        platform: _FakePlatform(),
+        updatePlatform: updatePlatform,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Check for updates'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(
+      find.byKey(const ValueKey('update-available-dialog')),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        'Kontakt Library Manager 1.1.0 is now available '
+        '(you have 1.0.0).',
+      ),
+      findsOneWidget,
+    );
+    expect(updatePlatform.installCount, 0);
+    expect(
+      tester
+          .widget<AlertDialog>(
+            find.byKey(const ValueKey('update-available-dialog')),
+          )
+          .actions,
+      hasLength(1),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('confirm-install-update')));
+    await tester.pumpAndSettle();
+
+    expect(updatePlatform.installCount, 1);
   });
 
   testWidgets('Settings only shows its title and changes the app theme', (
@@ -150,8 +230,20 @@ void main() {
     expect(find.textContaining('Version 1.0.0'), findsOneWidget);
 
     await tester.tap(find.text('Check for updates'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(updatePlatform.probeCount, 2);
+    expect(updatePlatform.installCount, 0);
+    expect(find.byKey(const ValueKey('up-to-date-dialog')), findsOneWidget);
+    expect(find.text("You're up to date!"), findsOneWidget);
+    expect(
+      find.text(
+        'Kontakt Library Manager 1.0.0 is currently the newest version available.',
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Close'));
     await tester.pumpAndSettle();
-    expect(updatePlatform.checkCount, 1);
 
     await tester.tap(find.text('System'));
     await tester.pumpAndSettle();
@@ -323,10 +415,10 @@ void main() {
 }
 
 class _FakeAppUpdatePlatform implements AppUpdatePlatform {
-  _FakeAppUpdatePlatform({this.updateAvailable = false});
+  _FakeAppUpdatePlatform({this.availableUpdate});
 
-  final bool updateAvailable;
-  int checkCount = 0;
+  final AvailableAppUpdate? availableUpdate;
+  int installCount = 0;
   int probeCount = 0;
 
   @override
@@ -334,14 +426,14 @@ class _FakeAppUpdatePlatform implements AppUpdatePlatform {
       const AppUpdateInfo(currentVersion: '1.0.0', configured: true);
 
   @override
-  Future<bool> probeForUpdates() async {
+  Future<AvailableAppUpdate?> probeForUpdates() async {
     probeCount += 1;
-    return updateAvailable;
+    return availableUpdate;
   }
 
   @override
-  Future<void> checkForUpdates() async {
-    checkCount += 1;
+  Future<void> installUpdate() async {
+    installCount += 1;
   }
 }
 

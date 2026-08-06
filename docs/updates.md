@@ -5,7 +5,10 @@ signatures. KLM performs one silent update probe when it opens. If a new
 version exists, a persistent in-app notice lets the user start the secure
 download and installation flow with one localized Install update action. The
 native updaters do not offer skip or remind-later choices. Update checks run
-only while KLM is open and do not use a background schedule.
+only while KLM is open and do not use a background schedule. A manual check
+always reports its result: it either shows the available and installed version
+or confirms that KLM is up to date. The sidebar notice opens the same dialog;
+installation starts only after the user selects Install update.
 
 ## Distribution rules
 
@@ -75,4 +78,5 @@ updates/appcast-windows.xml
 
 Commit the appcast without editing it. Existing Windows installations will
 then show the same persistent in-app update notice used on macOS. Clicking it
-opens WinSparkle, which verifies, downloads, and runs the installer.
+opens the shared version dialog. After confirmation, WinSparkle verifies,
+downloads, and runs the installer.

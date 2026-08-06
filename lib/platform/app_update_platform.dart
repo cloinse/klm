@@ -16,12 +16,19 @@ class AppUpdateInfo {
   final bool configured;
 }
 
+class AvailableAppUpdate {
+  const AvailableAppUpdate({required this.version, this.build = ''});
+
+  final String version;
+  final String build;
+}
+
 abstract interface class AppUpdatePlatform {
   Future<AppUpdateInfo> getInfo();
 
-  Future<bool> probeForUpdates();
+  Future<AvailableAppUpdate?> probeForUpdates();
 
-  Future<void> checkForUpdates();
+  Future<void> installUpdate();
 }
 
 AppUpdatePlatform createAppUpdatePlatform() {
@@ -46,12 +53,20 @@ class MacOSAppUpdatePlatform implements AppUpdatePlatform {
   }
 
   @override
-  Future<void> checkForUpdates() =>
-      _channel.invokeMethod<void>('checkForUpdates');
+  Future<void> installUpdate() => _channel.invokeMethod<void>('installUpdate');
 
   @override
-  Future<bool> probeForUpdates() async =>
-      await _channel.invokeMethod<bool>('probeForUpdates') ?? false;
+  Future<AvailableAppUpdate?> probeForUpdates() async {
+    final result = await _channel.invokeMapMethod<String, Object?>(
+      'probeForUpdates',
+    );
+    final version = visibleAppVersion(result?['version']);
+    if (version.isEmpty) return null;
+    return AvailableAppUpdate(
+      version: version,
+      build: result?['build'] as String? ?? '',
+    );
+  }
 }
 
 class WindowsAppUpdatePlatform implements AppUpdatePlatform {
@@ -74,9 +89,9 @@ class WindowsAppUpdatePlatform implements AppUpdatePlatform {
   }
 
   @override
-  Future<bool> probeForUpdates() async {
+  Future<AvailableAppUpdate?> probeForUpdates() async {
     final info = await getInfo();
-    if (!info.configured || info.currentVersion.isEmpty) return false;
+    if (!info.configured || info.currentVersion.isEmpty) return null;
 
     final client = HttpClient()..connectionTimeout = const Duration(seconds: 8);
     try {
@@ -88,12 +103,12 @@ class WindowsAppUpdatePlatform implements AppUpdatePlatform {
       final response = await request.close().timeout(
         const Duration(seconds: 8),
       );
-      if (response.statusCode != HttpStatus.ok) return false;
+      if (response.statusCode != HttpStatus.ok) return null;
       final appcast = await utf8.decoder
           .bind(response)
           .join()
           .timeout(const Duration(seconds: 8));
-      return windowsAppcastHasNewerUpdate(
+      return windowsAppcastAvailableUpdate(
         appcast,
         currentVersion: info.currentVersion,
         currentBuild: info.currentBuild,
@@ -104,8 +119,7 @@ class WindowsAppUpdatePlatform implements AppUpdatePlatform {
   }
 
   @override
-  Future<void> checkForUpdates() =>
-      _channel.invokeMethod<void>('checkForUpdates');
+  Future<void> installUpdate() => _channel.invokeMethod<void>('installUpdate');
 }
 
 const _sparkleNamespace = 'http://www.andymatuschak.org/xml-namespaces/sparkle';
@@ -113,7 +127,7 @@ const _sparkleNamespace = 'http://www.andymatuschak.org/xml-namespaces/sparkle';
 String visibleAppVersion(Object? value) =>
     (value as String? ?? '').trim().split('+').first;
 
-bool windowsAppcastHasNewerUpdate(
+AvailableAppUpdate? windowsAppcastAvailableUpdate(
   String appcast, {
   required String currentVersion,
   required String currentBuild,
@@ -144,7 +158,16 @@ bool windowsAppcastHasNewerUpdate(
           .trim();
       final buildNumber = int.tryParse(build ?? '');
       if (currentBuildNumber != null && buildNumber != null) {
-        if (buildNumber > currentBuildNumber) return true;
+        if (buildNumber > currentBuildNumber) {
+          final version = item
+              .findElements('shortVersionString', namespace: _sparkleNamespace)
+              .firstOrNull
+              ?.innerText
+              .trim();
+          if (version?.isNotEmpty == true) {
+            return AvailableAppUpdate(version: version!, build: build ?? '');
+          }
+        }
         continue;
       }
 
@@ -154,11 +177,11 @@ bool windowsAppcastHasNewerUpdate(
           ?.innerText
           .trim();
       if (version != null && _compareVersions(version, currentVersion) > 0) {
-        return true;
+        return AvailableAppUpdate(version: version, build: build ?? '');
       }
     }
   }
-  return false;
+  return null;
 }
 
 int _compareVersions(String left, String right) {
@@ -189,10 +212,10 @@ class UnsupportedAppUpdatePlatform implements AppUpdatePlatform {
       const AppUpdateInfo(currentVersion: '', configured: false);
 
   @override
-  Future<bool> probeForUpdates() async => false;
+  Future<AvailableAppUpdate?> probeForUpdates() async => null;
 
   @override
-  Future<void> checkForUpdates() {
+  Future<void> installUpdate() {
     throw UnsupportedError('Application updates are unavailable.');
   }
 }

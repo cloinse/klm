@@ -157,7 +157,7 @@ final class UpdateBridge: NSObject, SPUUpdaterDelegate {
         }
         self.probeResult = result
         updater.checkForUpdateInformation()
-      case "checkForUpdates":
+      case "installUpdate":
         guard let updater = self.updater else {
           result(
             FlutterError(
@@ -184,11 +184,11 @@ final class UpdateBridge: NSObject, SPUUpdaterDelegate {
     _ updater: SPUUpdater,
     didFindValidUpdate item: SUAppcastItem
   ) {
-    completeProbe(available: true)
+    completeProbe(item: item)
   }
 
   func updaterDidNotFindUpdate(_ updater: SPUUpdater, error: any Error) {
-    completeProbe(available: false)
+    completeProbe(item: nil)
   }
 
   func updater(_ updater: SPUUpdater, didAbortWithError error: any Error) {
@@ -203,10 +203,17 @@ final class UpdateBridge: NSObject, SPUUpdaterDelegate {
     )
   }
 
-  private func completeProbe(available: Bool) {
+  private func completeProbe(item: SUAppcastItem?) {
     guard let result = probeResult else { return }
     probeResult = nil
-    result(available)
+    guard let item else {
+      result(nil)
+      return
+    }
+    result([
+      "version": item.displayVersionString,
+      "build": item.versionString,
+    ])
   }
 
   private var infoPayload: [String: Any] {

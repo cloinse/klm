@@ -19,14 +19,14 @@ void main() {
 ''';
 
   test('Windows appcast detects a newer signed build', () {
-    expect(
-      windowsAppcastHasNewerUpdate(
-        signedUpdate,
-        currentVersion: '0.1.3',
-        currentBuild: '4',
-      ),
-      isTrue,
+    final update = windowsAppcastAvailableUpdate(
+      signedUpdate,
+      currentVersion: '0.1.3',
+      currentBuild: '4',
     );
+
+    expect(update?.version, '0.1.4');
+    expect(update?.build, '5');
   });
 
   test('visible version omits Flutter internal build number', () {
@@ -36,12 +36,12 @@ void main() {
 
   test('Windows appcast ignores the current build', () {
     expect(
-      windowsAppcastHasNewerUpdate(
+      windowsAppcastAvailableUpdate(
         signedUpdate,
         currentVersion: '0.1.4',
         currentBuild: '5',
       ),
-      isFalse,
+      isNull,
     );
   });
 
@@ -50,12 +50,12 @@ void main() {
         .replaceFirst('sparkle:os="windows-x64"', 'sparkle:os="macos"')
         .replaceFirst('sparkle:edSignature="signed"', '');
     expect(
-      windowsAppcastHasNewerUpdate(
+      windowsAppcastAvailableUpdate(
         invalid,
         currentVersion: '0.1.3',
         currentBuild: '4',
       ),
-      isFalse,
+      isNull,
     );
   });
 }

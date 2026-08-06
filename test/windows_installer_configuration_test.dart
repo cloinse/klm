@@ -16,7 +16,7 @@ void main() {
     expect(runEntry, isNot(contains('skipifsilent')));
   });
 
-  test('WinSparkle installs immediately without an update choice dialog', () {
+  test('WinSparkle installs only after the shared confirmation dialog', () {
     final updateBridge = File(
       'windows/runner/update_bridge.cpp',
     ).readAsStringSync();
@@ -25,6 +25,7 @@ void main() {
       updateBridge,
       contains('win_sparkle_check_update_with_ui_and_install'),
     );
+    expect(updateBridge, contains('call.method_name() == "installUpdate"'));
     expect(updateBridge, isNot(contains('"win_sparkle_check_update_with_ui"')));
   });
 }

@@ -195,7 +195,12 @@ class AppLocalizations {
           'Version {version}. Updates are checked only while the app is open.',
       'checkForUpdates': 'Check for updates',
       'updateAvailable': 'Update available',
+      'updateAvailableMessage':
+          'Kontakt Library Manager {version} is now available (you have {currentVersion}).',
       'downloadAndInstall': 'Install update',
+      'upToDate': "You're up to date!",
+      'upToDateMessage':
+          'Kontakt Library Manager {version} is currently the newest version available.',
       'updatesUnavailable': 'The update service is unavailable.',
       'inventorySummary': '{count} libraries detected.',
       'operation_inventory_updated_title': 'Inventory refreshed',
@@ -342,7 +347,12 @@ class AppLocalizations {
           'Versión {version}. Las actualizaciones solo se comprueban mientras la aplicación está abierta.',
       'checkForUpdates': 'Buscar actualizaciones',
       'updateAvailable': 'Actualización disponible',
+      'updateAvailableMessage':
+          'Kontakt Library Manager {version} ya está disponible (tienes la versión {currentVersion}).',
       'downloadAndInstall': 'Instalar actualización',
+      'upToDate': '¡Estás al día!',
+      'upToDateMessage':
+          'Kontakt Library Manager {version} es actualmente la versión más reciente disponible.',
       'updatesUnavailable':
           'El servicio de actualizaciones no está disponible.',
       'inventorySummary': '{count} librerías detectadas.',
@@ -492,7 +502,12 @@ class AppLocalizations {
           'Versão {version}. As atualizações são verificadas somente enquanto o aplicativo está aberto.',
       'checkForUpdates': 'Buscar atualizações',
       'updateAvailable': 'Atualização disponível',
+      'updateAvailableMessage':
+          'Kontakt Library Manager {version} está disponível (você tem a versão {currentVersion}).',
       'downloadAndInstall': 'Instalar atualização',
+      'upToDate': 'Você está atualizado!',
+      'upToDateMessage':
+          'Kontakt Library Manager {version} é atualmente a versão mais recente disponível.',
       'updatesUnavailable': 'O serviço de atualizações não está disponível.',
       'inventorySummary': '{count} bibliotecas detectadas.',
       'operation_inventory_updated_title': 'Inventário atualizado',

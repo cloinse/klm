@@ -32,7 +32,8 @@ class LibraryDashboard extends StatefulWidget {
 class _LibraryDashboardState extends State<LibraryDashboard> {
   DashboardSection _section = DashboardSection.library;
   late Future<AppUpdateInfo> _appUpdateInfo;
-  bool _updateAvailable = false;
+  Future<AvailableAppUpdate?>? _activeUpdateProbe;
+  AvailableAppUpdate? _availableUpdate;
 
   @override
   void initState() {
@@ -46,23 +47,109 @@ class _LibraryDashboardState extends State<LibraryDashboard> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.updatePlatform != widget.updatePlatform) {
       _appUpdateInfo = widget.updatePlatform.getInfo();
-      _updateAvailable = false;
+      _activeUpdateProbe = null;
+      _availableUpdate = null;
       _probeForUpdates();
     }
   }
 
   Future<void> _probeForUpdates() async {
     try {
-      final available = await widget.updatePlatform.probeForUpdates();
-      if (mounted) setState(() => _updateAvailable = available);
+      final update = await _runUpdateProbe();
+      if (mounted) setState(() => _availableUpdate = update);
     } catch (_) {
       // The launch check is intentionally silent when the feed is unavailable.
     }
   }
 
-  Future<void> _downloadAndInstallUpdate() async {
+  Future<void> _checkForUpdates({AvailableAppUpdate? knownUpdate}) async {
     try {
-      await widget.updatePlatform.checkForUpdates();
+      final update = knownUpdate ?? await _runUpdateProbe();
+      if (!mounted) return;
+      setState(() => _availableUpdate = update);
+      final info = await _appUpdateInfo;
+      if (!mounted) return;
+      if (update == null) {
+        await _showUpToDateDialog(info.currentVersion);
+      } else {
+        await _showUpdateAvailableDialog(info, update);
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.l10n.tr('updatesUnavailable'))),
+        );
+      }
+    }
+  }
+
+  Future<AvailableAppUpdate?> _runUpdateProbe() {
+    final activeProbe = _activeUpdateProbe;
+    if (activeProbe != null) return activeProbe;
+
+    late final Future<AvailableAppUpdate?> trackedProbe;
+    trackedProbe = widget.updatePlatform.probeForUpdates().whenComplete(() {
+      if (identical(_activeUpdateProbe, trackedProbe)) {
+        _activeUpdateProbe = null;
+      }
+    });
+    _activeUpdateProbe = trackedProbe;
+    return trackedProbe;
+  }
+
+  Future<void> _showUpdateAvailableDialog(
+    AppUpdateInfo info,
+    AvailableAppUpdate update,
+  ) {
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const ValueKey('update-available-dialog'),
+        icon: const Icon(Icons.system_update_alt_rounded),
+        title: Text(context.l10n.tr('updateAvailable')),
+        content: Text(
+          context.l10n.format('updateAvailableMessage', {
+            'version': update.version,
+            'currentVersion': info.currentVersion,
+          }),
+        ),
+        actions: [
+          FilledButton(
+            key: const ValueKey('confirm-install-update'),
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              await _installUpdate();
+            },
+            child: Text(context.l10n.tr('downloadAndInstall')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showUpToDateDialog(String currentVersion) {
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const ValueKey('up-to-date-dialog'),
+        icon: const Icon(Icons.check_circle_outline_rounded),
+        title: Text(context.l10n.tr('upToDate')),
+        content: Text(
+          context.l10n.format('upToDateMessage', {'version': currentVersion}),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(context.l10n.tr('close')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _installUpdate() async {
+    try {
+      await widget.updatePlatform.installUpdate();
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -89,8 +176,9 @@ class _LibraryDashboardState extends State<LibraryDashboard> {
                       section: _section,
                       attentionCount: widget.controller.attentionCount,
                       updateInfo: _appUpdateInfo,
-                      updateAvailable: _updateAvailable,
-                      onInstallUpdate: _downloadAndInstallUpdate,
+                      updateAvailable: _availableUpdate != null,
+                      onInstallUpdate: () =>
+                          _checkForUpdates(knownUpdate: _availableUpdate),
                       onSelected: (section) =>
                           setState(() => _section = section),
                     ),
@@ -120,6 +208,7 @@ class _LibraryDashboardState extends State<LibraryDashboard> {
       localeController: widget.localeController,
       themeController: widget.themeController,
       updatePlatform: widget.updatePlatform,
+      onCheckForUpdates: _checkForUpdates,
     ),
   };
 }
@@ -1706,11 +1795,13 @@ class _SettingsView extends StatelessWidget {
     required this.localeController,
     required this.themeController,
     required this.updatePlatform,
+    required this.onCheckForUpdates,
   });
 
   final LocaleController localeController;
   final ThemeController themeController;
   final AppUpdatePlatform updatePlatform;
+  final Future<void> Function() onCheckForUpdates;
 
   @override
   Widget build(BuildContext context) {
@@ -1725,7 +1816,10 @@ class _SettingsView extends StatelessWidget {
           const SizedBox(height: 14),
           _ThemeSettingsCard(themeController: themeController),
           const SizedBox(height: 14),
-          _UpdateSettingsCard(updatePlatform: updatePlatform),
+          _UpdateSettingsCard(
+            updatePlatform: updatePlatform,
+            onCheckForUpdates: onCheckForUpdates,
+          ),
         ],
       ),
     );
@@ -1874,9 +1968,13 @@ class _ThemeSettingsCard extends StatelessWidget {
 }
 
 class _UpdateSettingsCard extends StatefulWidget {
-  const _UpdateSettingsCard({required this.updatePlatform});
+  const _UpdateSettingsCard({
+    required this.updatePlatform,
+    required this.onCheckForUpdates,
+  });
 
   final AppUpdatePlatform updatePlatform;
+  final Future<void> Function() onCheckForUpdates;
 
   @override
   State<_UpdateSettingsCard> createState() => _UpdateSettingsCardState();
@@ -1907,13 +2005,7 @@ class _UpdateSettingsCardState extends State<_UpdateSettingsCard> {
   Future<void> _checkForUpdates() async {
     setState(() => _checking = true);
     try {
-      await widget.updatePlatform.checkForUpdates();
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.l10n.tr('updatesUnavailable'))),
-        );
-      }
+      await widget.onCheckForUpdates();
     } finally {
       if (mounted) setState(() => _checking = false);
     }
