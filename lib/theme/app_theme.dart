@@ -11,6 +11,9 @@ class KlmColors extends ThemeExtension<KlmColors> {
     required this.iconTileStart,
     required this.iconTileEnd,
     required this.iconForeground,
+    required this.navigationSelectedBackground,
+    required this.navigationSelectedForeground,
+    required this.navigationSelectedBorder,
     required this.secondaryText,
     required this.tertiaryText,
     required this.mutedIcon,
@@ -24,6 +27,9 @@ class KlmColors extends ThemeExtension<KlmColors> {
   final Color iconTileStart;
   final Color iconTileEnd;
   final Color iconForeground;
+  final Color navigationSelectedBackground;
+  final Color navigationSelectedForeground;
+  final Color navigationSelectedBorder;
   final Color secondaryText;
   final Color tertiaryText;
   final Color mutedIcon;
@@ -37,6 +43,9 @@ class KlmColors extends ThemeExtension<KlmColors> {
     iconTileStart: Color(0xFF303946),
     iconTileEnd: Color(0xFF1D2530),
     iconForeground: Color(0xFFB5BEC8),
+    navigationSelectedBackground: Color(0xFF312719),
+    navigationSelectedForeground: Color(0xFFFFC65A),
+    navigationSelectedBorder: Color(0xFF6F5626),
     secondaryText: Color(0xFF8995A3),
     tertiaryText: Color(0xFF6F7B89),
     mutedIcon: Color(0xFF8793A0),
@@ -51,6 +60,9 @@ class KlmColors extends ThemeExtension<KlmColors> {
     iconTileStart: Color(0xFFE9EEF4),
     iconTileEnd: Color(0xFFDDE5EE),
     iconForeground: Color(0xFF536171),
+    navigationSelectedBackground: Color(0xFF8A5A00),
+    navigationSelectedForeground: Color(0xFFFFFFFF),
+    navigationSelectedBorder: Color(0xFF6E4700),
     secondaryText: Color(0xFF5F6C7A),
     tertiaryText: Color(0xFF74808D),
     mutedIcon: Color(0xFF647180),
@@ -66,6 +78,9 @@ class KlmColors extends ThemeExtension<KlmColors> {
     Color? iconTileStart,
     Color? iconTileEnd,
     Color? iconForeground,
+    Color? navigationSelectedBackground,
+    Color? navigationSelectedForeground,
+    Color? navigationSelectedBorder,
     Color? secondaryText,
     Color? tertiaryText,
     Color? mutedIcon,
@@ -78,6 +93,12 @@ class KlmColors extends ThemeExtension<KlmColors> {
     iconTileStart: iconTileStart ?? this.iconTileStart,
     iconTileEnd: iconTileEnd ?? this.iconTileEnd,
     iconForeground: iconForeground ?? this.iconForeground,
+    navigationSelectedBackground:
+        navigationSelectedBackground ?? this.navigationSelectedBackground,
+    navigationSelectedForeground:
+        navigationSelectedForeground ?? this.navigationSelectedForeground,
+    navigationSelectedBorder:
+        navigationSelectedBorder ?? this.navigationSelectedBorder,
     secondaryText: secondaryText ?? this.secondaryText,
     tertiaryText: tertiaryText ?? this.tertiaryText,
     mutedIcon: mutedIcon ?? this.mutedIcon,
@@ -95,6 +116,21 @@ class KlmColors extends ThemeExtension<KlmColors> {
       iconTileStart: Color.lerp(iconTileStart, other.iconTileStart, t)!,
       iconTileEnd: Color.lerp(iconTileEnd, other.iconTileEnd, t)!,
       iconForeground: Color.lerp(iconForeground, other.iconForeground, t)!,
+      navigationSelectedBackground: Color.lerp(
+        navigationSelectedBackground,
+        other.navigationSelectedBackground,
+        t,
+      )!,
+      navigationSelectedForeground: Color.lerp(
+        navigationSelectedForeground,
+        other.navigationSelectedForeground,
+        t,
+      )!,
+      navigationSelectedBorder: Color.lerp(
+        navigationSelectedBorder,
+        other.navigationSelectedBorder,
+        t,
+      )!,
       secondaryText: Color.lerp(secondaryText, other.secondaryText, t)!,
       tertiaryText: Color.lerp(tertiaryText, other.tertiaryText, t)!,
       mutedIcon: Color.lerp(mutedIcon, other.mutedIcon, t)!,

@@ -7,6 +7,7 @@ import 'package:kontakt_library_manager/l10n/app_localizations.dart';
 import 'package:kontakt_library_manager/l10n/locale_controller.dart';
 import 'package:kontakt_library_manager/platform/app_update_platform.dart';
 import 'package:kontakt_library_manager/platform/kontakt_platform.dart';
+import 'package:kontakt_library_manager/theme/app_theme.dart';
 import 'package:kontakt_library_manager/theme/theme_controller.dart';
 
 void main() {
@@ -174,6 +175,62 @@ void main() {
       ThemeMode.dark,
     );
   });
+
+  testWidgets(
+    'light theme clearly distinguishes the selected navigation item',
+    (tester) async {
+      tester.view.physicalSize = const Size(1400, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final themeController = ThemeController();
+      addTearDown(themeController.dispose);
+      await themeController.setPreference(AppThemePreference.light);
+
+      await tester.pumpWidget(
+        KontaktLibraryManagerApp(
+          platform: _FakePlatform(),
+          themeController: themeController,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      Material selectedMaterial(String key) => tester.widget<Material>(
+        find
+            .descendant(
+              of: find.byKey(ValueKey(key)),
+              matching: find.byType(Material),
+            )
+            .first,
+      );
+
+      expect(
+        selectedMaterial('navigation-library').color,
+        KlmColors.light.navigationSelectedBackground,
+      );
+      expect(
+        tester
+            .widget<Text>(
+              find.descendant(
+                of: find.byKey(const ValueKey('navigation-library')),
+                matching: find.text('Library'),
+              ),
+            )
+            .style
+            ?.color,
+        KlmColors.light.navigationSelectedForeground,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('navigation-settings')));
+      await tester.pumpAndSettle();
+
+      expect(
+        selectedMaterial('navigation-settings').color,
+        KlmColors.light.navigationSelectedBackground,
+      );
+      expect(selectedMaterial('navigation-library').color, Colors.transparent);
+    },
+  );
 
   testWidgets('dragging a library reveals the save changes button', (
     tester,

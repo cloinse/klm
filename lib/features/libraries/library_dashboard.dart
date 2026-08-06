@@ -277,6 +277,7 @@ class _Sidebar extends StatelessWidget {
           ),
           const SizedBox(height: 32),
           _NavigationItem(
+            key: const ValueKey('navigation-library'),
             compact: compact,
             selected: section == DashboardSection.library,
             icon: Icons.grid_view_rounded,
@@ -284,6 +285,7 @@ class _Sidebar extends StatelessWidget {
             onTap: () => onSelected(DashboardSection.library),
           ),
           _NavigationItem(
+            key: const ValueKey('navigation-diagnostics'),
             compact: compact,
             selected: section == DashboardSection.diagnostics,
             icon: Icons.monitor_heart_outlined,
@@ -292,6 +294,7 @@ class _Sidebar extends StatelessWidget {
             onTap: () => onSelected(DashboardSection.diagnostics),
           ),
           _NavigationItem(
+            key: const ValueKey('navigation-activity'),
             compact: compact,
             selected: section == DashboardSection.activity,
             icon: Icons.history_rounded,
@@ -307,6 +310,7 @@ class _Sidebar extends StatelessWidget {
             const SizedBox(height: 12),
           ],
           _NavigationItem(
+            key: const ValueKey('navigation-settings'),
             compact: compact,
             selected: section == DashboardSection.settings,
             icon: Icons.settings_outlined,
@@ -343,6 +347,7 @@ class _Sidebar extends StatelessWidget {
 
 class _NavigationItem extends StatelessWidget {
   const _NavigationItem({
+    super.key,
     required this.compact,
     required this.selected,
     required this.icon,
@@ -360,16 +365,25 @@ class _NavigationItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.klmColors;
     final foreground = selected
-        ? const Color(0xFFF6BD50)
-        : context.klmColors.secondaryText;
+        ? colors.navigationSelectedForeground
+        : colors.secondaryText;
     return Padding(
       padding: const EdgeInsets.only(bottom: 5),
       child: Tooltip(
         message: compact ? label : '',
         child: Material(
-          color: selected ? const Color(0x1FF2B544) : Colors.transparent,
-          borderRadius: BorderRadius.circular(9),
+          color: selected
+              ? colors.navigationSelectedBackground
+              : Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(9),
+            side: selected
+                ? BorderSide(color: colors.navigationSelectedBorder)
+                : BorderSide.none,
+          ),
+          clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: onTap,
             borderRadius: BorderRadius.circular(9),
