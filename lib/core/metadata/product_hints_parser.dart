@@ -79,7 +79,7 @@ class ProductHintsParser {
       name: name,
       regKey: regKey,
       snpid: snpid,
-      visibility: int.tryParse(_value(product, 'Visibility')),
+      visibility: int.tryParse(_productSpecificValue(product, 'Visibility')),
       hu: _nullable(_value(product, 'HU')),
       jdx: _nullable(_value(product, 'JDX')),
       upid: _nullable(_value(product, 'UPID')),
@@ -95,6 +95,16 @@ class ProductHintsParser {
   String _value(XmlElement parent, String name) {
     final elements = parent.findAllElements(name);
     return elements.isEmpty ? '' : elements.first.innerText.trim();
+  }
+
+  String _productSpecificValue(XmlElement product, String name) {
+    for (final element in product.childElements) {
+      if (element.name.local != 'ProductSpecific') continue;
+      for (final value in element.childElements) {
+        if (value.name.local == name) return value.innerText.trim();
+      }
+    }
+    return '';
   }
 
   String? _nullable(String? value) {

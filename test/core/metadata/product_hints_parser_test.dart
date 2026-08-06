@@ -44,6 +44,35 @@ otros datos
     expect(document.xml, contains('<SNPID>A1B</SNPID>'));
   });
 
+  test('uses ProductSpecific visibility for the Windows registry', () {
+    const xml = '''
+<ProductHints spec="1.0.16">
+  <Product version="1">
+    <Name>S90 ES</Name>
+    <Type>Content</Type>
+    <PoweredBy>Kontakt</PoweredBy>
+    <Visibility>7</Visibility>
+    <Company>Native Instruments GmbH</Company>
+    <AuthSystem>RAS2</AuthSystem>
+    <SNPID>ZA1</SNPID>
+    <RegKey>S90 ES</RegKey>
+    <Icon>kontakt</Icon>
+    <ProductSpecific>
+      <HU>6B70EC16E02410D1A515685C1001D559</HU>
+      <JDX>023730940B73318EAEAD916E3989EC68BE72599A2F1738F828A7D028C9B1ECCA</JDX>
+      <Visibility type="Number">3</Visibility>
+    </ProductSpecific>
+  </Product>
+</ProductHints>
+''';
+
+    final document = parser.parseDocumentText(xml);
+
+    expect(document.metadata.visibility, 3);
+    expect(document.xml, contains('<Visibility>7</Visibility>'));
+    expect(document.xml, contains('<Visibility type="Number">3</Visibility>'));
+  });
+
   test('rechaza metadata sin campos obligatorios', () {
     const xml =
         '<ProductHints><Product><Name>A</Name></Product></ProductHints>';
