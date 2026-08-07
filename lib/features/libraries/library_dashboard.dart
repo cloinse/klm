@@ -415,8 +415,8 @@ class _Sidebar extends StatelessWidget {
                 builder: (context, snapshot) {
                   final version = snapshot.data?.currentVersion.trim() ?? '';
                   final footer = version.isEmpty
-                      ? 'Juan Ayala'
-                      : 'v$version · Juan Ayala';
+                      ? 'KLM - Juan Ayala'
+                      : 'KLM v$version - Juan Ayala';
                   return Text(
                     footer,
                     style: TextStyle(

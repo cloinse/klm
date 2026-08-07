@@ -213,7 +213,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('v1.0.0 · Juan Ayala'), findsOneWidget);
+    expect(find.text('KLM v1.0.0 - Juan Ayala'), findsOneWidget);
 
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
