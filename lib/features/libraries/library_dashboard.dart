@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:kontakt_library_manager/core/models/kontakt_library.dart';
@@ -6,6 +8,7 @@ import 'package:kontakt_library_manager/features/libraries/library_inventory_con
 import 'package:kontakt_library_manager/l10n/app_localizations.dart';
 import 'package:kontakt_library_manager/l10n/locale_controller.dart';
 import 'package:kontakt_library_manager/platform/app_update_platform.dart';
+import 'package:kontakt_library_manager/platform/feedback_service.dart';
 import 'package:kontakt_library_manager/theme/app_theme.dart';
 import 'package:kontakt_library_manager/theme/theme_controller.dart';
 
@@ -18,12 +21,14 @@ class LibraryDashboard extends StatefulWidget {
     required this.localeController,
     required this.themeController,
     required this.updatePlatform,
+    required this.feedbackService,
   });
 
   final LibraryInventoryController controller;
   final LocaleController localeController;
   final ThemeController themeController;
   final AppUpdatePlatform updatePlatform;
+  final FeedbackService feedbackService;
 
   @override
   State<LibraryDashboard> createState() => _LibraryDashboardState();
@@ -202,6 +207,7 @@ class _LibraryDashboardState extends State<LibraryDashboard> {
       localeController: widget.localeController,
       themeController: widget.themeController,
       updatePlatform: widget.updatePlatform,
+      feedbackService: widget.feedbackService,
       onCheckForUpdates: _checkForUpdates,
     ),
   };
@@ -1775,12 +1781,14 @@ class _SettingsView extends StatelessWidget {
     required this.localeController,
     required this.themeController,
     required this.updatePlatform,
+    required this.feedbackService,
     required this.onCheckForUpdates,
   });
 
   final LocaleController localeController;
   final ThemeController themeController;
   final AppUpdatePlatform updatePlatform;
+  final FeedbackService feedbackService;
   final Future<void> Function() onCheckForUpdates;
 
   @override
@@ -1799,6 +1807,11 @@ class _SettingsView extends StatelessWidget {
           _UpdateSettingsCard(
             updatePlatform: updatePlatform,
             onCheckForUpdates: onCheckForUpdates,
+          ),
+          const SizedBox(height: 14),
+          _FeedbackSettingsCard(
+            feedbackService: feedbackService,
+            updatePlatform: updatePlatform,
           ),
         ],
       ),
@@ -2020,6 +2033,245 @@ class _UpdateSettingsCardState extends State<_UpdateSettingsCard> {
           label: Text(context.l10n.tr('checkForUpdates')),
         ),
       ),
+    );
+  }
+}
+
+class _FeedbackSettingsCard extends StatefulWidget {
+  const _FeedbackSettingsCard({
+    required this.feedbackService,
+    required this.updatePlatform,
+  });
+
+  final FeedbackService feedbackService;
+  final AppUpdatePlatform updatePlatform;
+
+  @override
+  State<_FeedbackSettingsCard> createState() => _FeedbackSettingsCardState();
+}
+
+class _FeedbackSettingsCardState extends State<_FeedbackSettingsCard> {
+  bool _submitting = false;
+
+  Future<void> _openFeedbackDialog() async {
+    final draft = await showDialog<_FeedbackDraft>(
+      context: context,
+      builder: (_) => const _FeedbackDialog(),
+    );
+    if (draft == null || !mounted) return;
+
+    final locale = Localizations.localeOf(context);
+    final localeTag = locale.countryCode == null
+        ? locale.languageCode
+        : '${locale.languageCode}_${locale.countryCode}';
+
+    setState(() => _submitting = true);
+    try {
+      String? appVersion;
+      if (draft.includeTechnicalInfo) {
+        try {
+          appVersion = (await widget.updatePlatform.getInfo()).currentVersion;
+        } catch (_) {
+          // Technical metadata is optional and should not block feedback.
+        }
+      }
+
+      await widget.feedbackService.submit(
+        FeedbackSubmission(
+          type: draft.type,
+          message: draft.message,
+          email: draft.email,
+          appVersion: appVersion,
+          platform: draft.includeTechnicalInfo
+              ? Platform.operatingSystem
+              : null,
+          locale: draft.includeTechnicalInfo ? localeTag : null,
+        ),
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.l10n.tr('feedbackSent'))),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.l10n.tr('feedbackFailed'))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _SettingsCard(
+      icon: Icons.feedback_outlined,
+      title: context.l10n.tr('feedbackSection'),
+      description: context.l10n.tr('feedbackDescription'),
+      child: SizedBox(
+        width: 205,
+        child: OutlinedButton.icon(
+          key: const ValueKey('open-feedback-button'),
+          onPressed: _submitting ? null : _openFeedbackDialog,
+          icon: _submitting
+              ? const SizedBox.square(
+                  dimension: 15,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.feedback_outlined, size: 18),
+          label: Text(context.l10n.tr('sendFeedback')),
+        ),
+      ),
+    );
+  }
+}
+
+class _FeedbackDraft {
+  const _FeedbackDraft({
+    required this.type,
+    required this.message,
+    required this.email,
+    required this.includeTechnicalInfo,
+  });
+
+  final String type;
+  final String message;
+  final String? email;
+  final bool includeTechnicalInfo;
+}
+
+class _FeedbackDialog extends StatefulWidget {
+  const _FeedbackDialog();
+
+  @override
+  State<_FeedbackDialog> createState() => _FeedbackDialogState();
+}
+
+class _FeedbackDialogState extends State<_FeedbackDialog> {
+  final _messageController = TextEditingController();
+  final _emailController = TextEditingController();
+  String _type = 'suggestion';
+  bool _includeTechnicalInfo = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    _emailController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final message = _messageController.text.trim();
+    if (message.length < 3) {
+      setState(() => _error = context.l10n.tr('feedbackMissingMessage'));
+      return;
+    }
+
+    Navigator.pop(
+      context,
+      _FeedbackDraft(
+        type: _type,
+        message: message,
+        email: _emailController.text.trim().isEmpty
+            ? null
+            : _emailController.text.trim(),
+        includeTechnicalInfo: _includeTechnicalInfo,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      key: const ValueKey('feedback-dialog'),
+      title: Text(context.l10n.tr('feedbackDialogTitle')),
+      content: SizedBox(
+        width: 520,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              DropdownButtonFormField<String>(
+                initialValue: _type,
+                decoration: InputDecoration(
+                  labelText: context.l10n.tr('feedbackType'),
+                ),
+                items: [
+                  DropdownMenuItem(
+                    value: 'bug',
+                    child: Text(context.l10n.tr('feedbackTypeBug')),
+                  ),
+                  DropdownMenuItem(
+                    value: 'suggestion',
+                    child: Text(context.l10n.tr('feedbackTypeSuggestion')),
+                  ),
+                  DropdownMenuItem(
+                    value: 'question',
+                    child: Text(context.l10n.tr('feedbackTypeQuestion')),
+                  ),
+                ],
+                onChanged: (value) {
+                  if (value != null) setState(() => _type = value);
+                },
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _messageController,
+                autofocus: true,
+                maxLines: 7,
+                maxLength: 4000,
+                decoration: InputDecoration(
+                  labelText: context.l10n.tr('feedbackMessage'),
+                  hintText: context.l10n.tr('feedbackMessageHint'),
+                  alignLabelWithHint: true,
+                ),
+              ),
+              const SizedBox(height: 4),
+              TextField(
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                decoration: InputDecoration(
+                  labelText: context.l10n.tr('feedbackEmailOptional'),
+                ),
+              ),
+              const SizedBox(height: 8),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _includeTechnicalInfo,
+                onChanged: (value) =>
+                    setState(() => _includeTechnicalInfo = value ?? false),
+                title: Text(context.l10n.tr('feedbackIncludeTechnicalInfo')),
+                subtitle: Text(
+                  context.l10n.tr('feedbackTechnicalInfoDescription'),
+                ),
+                controlAffinity: ListTileControlAffinity.leading,
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  _error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(context.l10n.tr('cancel')),
+        ),
+        FilledButton(
+          key: const ValueKey('submit-feedback'),
+          onPressed: _submit,
+          child: Text(context.l10n.tr('submitFeedback')),
+        ),
+      ],
     );
   }
 }

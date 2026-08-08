@@ -5,6 +5,7 @@ import 'package:kontakt_library_manager/features/libraries/library_inventory_con
 import 'package:kontakt_library_manager/l10n/app_localizations.dart';
 import 'package:kontakt_library_manager/l10n/locale_controller.dart';
 import 'package:kontakt_library_manager/platform/app_update_platform.dart';
+import 'package:kontakt_library_manager/platform/feedback_service.dart';
 import 'package:kontakt_library_manager/platform/kontakt_platform.dart';
 import 'package:kontakt_library_manager/theme/app_theme.dart';
 import 'package:kontakt_library_manager/theme/theme_controller.dart';
@@ -16,12 +17,14 @@ class KontaktLibraryManagerApp extends StatefulWidget {
     this.localeController,
     this.themeController,
     this.updatePlatform,
+    this.feedbackService,
   });
 
   final KontaktPlatform platform;
   final LocaleController? localeController;
   final ThemeController? themeController;
   final AppUpdatePlatform? updatePlatform;
+  final FeedbackService? feedbackService;
 
   @override
   State<KontaktLibraryManagerApp> createState() =>
@@ -33,6 +36,7 @@ class _KontaktLibraryManagerAppState extends State<KontaktLibraryManagerApp> {
   late final LocaleController _localeController;
   late final ThemeController _themeController;
   late final AppUpdatePlatform _updatePlatform;
+  late final FeedbackService _feedbackService;
   late final bool _ownsLocaleController;
   late final bool _ownsThemeController;
 
@@ -44,6 +48,7 @@ class _KontaktLibraryManagerAppState extends State<KontaktLibraryManagerApp> {
     _localeController = widget.localeController ?? LocaleController();
     _themeController = widget.themeController ?? ThemeController();
     _updatePlatform = widget.updatePlatform ?? createAppUpdatePlatform();
+    _feedbackService = widget.feedbackService ?? const HttpFeedbackService();
     _controller = LibraryInventoryController(widget.platform)..refresh();
   }
 
@@ -78,6 +83,7 @@ class _KontaktLibraryManagerAppState extends State<KontaktLibraryManagerApp> {
           localeController: _localeController,
           themeController: _themeController,
           updatePlatform: _updatePlatform,
+          feedbackService: _feedbackService,
         ),
       ),
     );
