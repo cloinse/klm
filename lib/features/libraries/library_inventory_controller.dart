@@ -147,9 +147,22 @@ class LibraryInventoryController extends ChangeNotifier {
     final hadPendingChanges = hasUnsavedCustomOrder;
     final availableIds = libraries.map((library) => library.id).toSet();
     _customLibraryIds.removeWhere((id) => !availableIds.contains(id));
-    for (final library in _defaultCustomOrder(libraries)) {
-      if (!_customLibraryIds.contains(library.id)) {
-        _customLibraryIds.add(library.id);
+    final defaultOrder = _defaultCustomOrder(libraries);
+    final defaultPositions = <String, int>{
+      for (var index = 0; index < defaultOrder.length; index++)
+        defaultOrder[index].id: index,
+    };
+    for (var index = 0; index < defaultOrder.length; index++) {
+      final libraryId = defaultOrder[index].id;
+      if (_customLibraryIds.contains(libraryId)) continue;
+      final insertionIndex = _customLibraryIds.indexWhere((existingId) {
+        final existingPosition = defaultPositions[existingId];
+        return existingPosition != null && existingPosition > index;
+      });
+      if (insertionIndex < 0) {
+        _customLibraryIds.add(libraryId);
+      } else {
+        _customLibraryIds.insert(insertionIndex, libraryId);
       }
     }
 
@@ -262,11 +275,19 @@ class LibraryInventoryController extends ChangeNotifier {
   }
 
   Future<void> removeLibrary(KontaktLibrary library) async {
+    final shouldPersistOrder = _customLibraryIds.contains(library.id);
     await _runMutation(() async {
       await _ensureHelperEnabled();
       await platform.removeLibrary(library);
       _log('library_removed', library.name);
     });
+    if (shouldPersistOrder && platform.capabilities.canManageClassicOrder) {
+      _savedCustomLibraryIds = List<String>.unmodifiable([
+        ..._savedCustomLibraryIds.where((id) => id != library.id),
+        library.id,
+      ]);
+      await saveCustomOrder();
+    }
   }
 
   Future<void> _runMutation(Future<void> Function() operation) async {

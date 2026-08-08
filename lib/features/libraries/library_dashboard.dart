@@ -166,27 +166,21 @@ class _LibraryDashboardState extends State<LibraryDashboard> {
       builder: (context, _) {
         return Scaffold(
           body: SafeArea(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final compact = constraints.maxWidth < 860;
-                return Row(
-                  children: [
-                    _Sidebar(
-                      compact: compact,
-                      section: _section,
-                      attentionCount: widget.controller.attentionCount,
-                      updateInfo: _appUpdateInfo,
-                      updateAvailable: _availableUpdate != null,
-                      onInstallUpdate: () =>
-                          _checkForUpdates(knownUpdate: _availableUpdate),
-                      onSelected: (section) =>
-                          setState(() => _section = section),
-                    ),
-                    const VerticalDivider(width: 1),
-                    Expanded(child: _buildSection()),
-                  ],
-                );
-              },
+            child: Row(
+              children: [
+                _Sidebar(
+                  compact: MediaQuery.sizeOf(context).width < 860,
+                  section: _section,
+                  attentionCount: widget.controller.attentionCount,
+                  updateInfo: _appUpdateInfo,
+                  updateAvailable: _availableUpdate != null,
+                  onInstallUpdate: () =>
+                      _checkForUpdates(knownUpdate: _availableUpdate),
+                  onSelected: (section) => setState(() => _section = section),
+                ),
+                const VerticalDivider(width: 1),
+                Expanded(child: _buildSection()),
+              ],
             ),
           ),
         );
@@ -1108,43 +1102,39 @@ class _StatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final stats = [
-          _StatData(
-            context.l10n.total,
-            '${controller.totalCount}',
-            Icons.album_outlined,
-            const Color(0xFF8BA8FF),
-          ),
-          _StatData(
-            context.l10n.healthy,
-            '${controller.healthyCount}',
-            Icons.check_circle_outline,
-            const Color(0xFF65D5A0),
-          ),
-          _StatData(
-            context.l10n.needsAttention,
-            '${controller.attentionCount}',
-            Icons.warning_amber_rounded,
-            const Color(0xFFFFA46C),
-          ),
-          _StatData(
-            context.l10n.offline,
-            '${controller.offlineCount}',
-            Icons.usb_off_outlined,
-            const Color(0xFFD493FF),
-          ),
-        ];
-        return Row(
-          children: [
-            for (var index = 0; index < stats.length; index++) ...[
-              if (index > 0) const SizedBox(width: 10),
-              Expanded(child: _StatCard(data: stats[index])),
-            ],
-          ],
-        );
-      },
+    final stats = [
+      _StatData(
+        context.l10n.total,
+        '${controller.totalCount}',
+        Icons.album_outlined,
+        const Color(0xFF8BA8FF),
+      ),
+      _StatData(
+        context.l10n.healthy,
+        '${controller.healthyCount}',
+        Icons.check_circle_outline,
+        const Color(0xFF65D5A0),
+      ),
+      _StatData(
+        context.l10n.needsAttention,
+        '${controller.attentionCount}',
+        Icons.warning_amber_rounded,
+        const Color(0xFFFFA46C),
+      ),
+      _StatData(
+        context.l10n.offline,
+        '${controller.offlineCount}',
+        Icons.usb_off_outlined,
+        const Color(0xFFD493FF),
+      ),
+    ];
+    return Row(
+      children: [
+        for (var index = 0; index < stats.length; index++) ...[
+          if (index > 0) const SizedBox(width: 10),
+          Expanded(child: _StatCard(data: stats[index])),
+        ],
+      ],
     );
   }
 }
@@ -1355,146 +1345,135 @@ class _LibraryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.klmColors;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final compact = constraints.maxWidth < 830;
-        return Container(
-          padding: const EdgeInsets.fromLTRB(14, 13, 8, 13),
-          decoration: BoxDecoration(
-            color: colors.card,
-            border: Border.all(color: colors.border),
-            borderRadius: BorderRadius.circular(12),
+    // ReorderableListView may lay out and move this child in the same frame.
+    // Reading the window size avoids a nested LayoutBuilder requesting a
+    // relayout while its reorderable ancestor is performing layout.
+    final compact = MediaQuery.sizeOf(context).width < 1120;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 13, 8, 13),
+      decoration: BoxDecoration(
+        color: colors.card,
+        border: Border.all(color: colors.border),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          if (dragHandle != null) ...[dragHandle!, const SizedBox(width: 2)],
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [colors.iconTileStart, colors.iconTileEnd],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Icon(Icons.graphic_eq_rounded, color: colors.iconForeground),
           ),
-          child: Row(
-            children: [
-              if (dragHandle != null) ...[
-                dragHandle!,
-                const SizedBox(width: 2),
-              ],
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [colors.iconTileStart, colors.iconTileEnd],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+          const SizedBox(width: 13),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  library.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
                   ),
-                  borderRadius: BorderRadius.circular(9),
                 ),
-                child: Icon(
-                  Icons.graphic_eq_rounded,
-                  color: colors.iconForeground,
+                const SizedBox(height: 4),
+                Text(
+                  library.contentPath ?? context.l10n.tr('unknownContentPath'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: colors.secondaryText, fontSize: 11),
                 ),
-              ),
-              const SizedBox(width: 13),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      library.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      library.contentPath ??
-                          context.l10n.tr('unknownContentPath'),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: colors.secondaryText,
-                        fontSize: 11,
-                      ),
-                    ),
-                    if (compact) ...[
-                      const SizedBox(height: 9),
-                      Wrap(
-                        spacing: 7,
-                        runSpacing: 6,
-                        children: [
-                          _SnpidChip(snpid: library.snpid),
-                          _HealthChip(health: library.health),
-                        ],
-                      ),
+                if (compact) ...[
+                  const SizedBox(height: 9),
+                  Wrap(
+                    spacing: 7,
+                    runSpacing: 6,
+                    children: [
+                      _SnpidChip(snpid: library.snpid),
+                      _HealthChip(health: library.health),
                     ],
-                  ],
-                ),
-              ),
-              if (!compact) ...[
-                const SizedBox(width: 16),
-                SizedBox(width: 76, child: _SnpidChip(snpid: library.snpid)),
-                const SizedBox(width: 10),
-                SizedBox(width: 36, child: _HealthChip(health: library.health)),
-              ],
-              PopupMenuButton<String>(
-                tooltip: context.l10n.tr('actions'),
-                icon: Icon(Icons.more_horiz_rounded, color: colors.mutedIcon),
-                onSelected: (value) {
-                  if (value == 'reveal') onReveal();
-                  if (value == 'diagnose') onDiagnose();
-                  if (value == 'repair') onRepair();
-                  if (value == 'relocate') onRelocate();
-                  if (value == 'remove') onRemove();
-                },
-                itemBuilder: (_) => [
-                  if (library.contentPath != null)
-                    PopupMenuItem(
-                      value: 'reveal',
-                      child: ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.folder_open_outlined),
-                        title: Text(context.l10n.tr('showInFolder')),
-                      ),
-                    ),
-                  PopupMenuItem(
-                    value: 'diagnose',
-                    child: ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.monitor_heart_outlined),
-                      title: Text(context.l10n.tr('viewDiagnostics')),
-                    ),
-                  ),
-                  PopupMenuItem(
-                    value: 'repair',
-                    child: ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.build_outlined),
-                      title: Text(context.l10n.tr('repairRecords')),
-                    ),
-                  ),
-                  PopupMenuItem(
-                    value: 'relocate',
-                    child: ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.drive_file_move_outline),
-                      title: Text(context.l10n.tr('relocateLibrary')),
-                    ),
-                  ),
-                  PopupMenuItem(
-                    value: 'remove',
-                    child: ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.delete_outline_rounded),
-                      title: Text(context.l10n.tr('removeRecords')),
-                    ),
                   ),
                 ],
+              ],
+            ),
+          ),
+          if (!compact) ...[
+            const SizedBox(width: 16),
+            SizedBox(width: 76, child: _SnpidChip(snpid: library.snpid)),
+            const SizedBox(width: 10),
+            SizedBox(width: 36, child: _HealthChip(health: library.health)),
+          ],
+          PopupMenuButton<String>(
+            tooltip: context.l10n.tr('actions'),
+            icon: Icon(Icons.more_horiz_rounded, color: colors.mutedIcon),
+            onSelected: (value) {
+              if (value == 'reveal') onReveal();
+              if (value == 'diagnose') onDiagnose();
+              if (value == 'repair') onRepair();
+              if (value == 'relocate') onRelocate();
+              if (value == 'remove') onRemove();
+            },
+            itemBuilder: (_) => [
+              if (library.contentPath != null)
+                PopupMenuItem(
+                  value: 'reveal',
+                  child: ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.folder_open_outlined),
+                    title: Text(context.l10n.tr('showInFolder')),
+                  ),
+                ),
+              PopupMenuItem(
+                value: 'diagnose',
+                child: ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.monitor_heart_outlined),
+                  title: Text(context.l10n.tr('viewDiagnostics')),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'repair',
+                child: ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.build_outlined),
+                  title: Text(context.l10n.tr('repairRecords')),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'relocate',
+                child: ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.drive_file_move_outline),
+                  title: Text(context.l10n.tr('relocateLibrary')),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'remove',
+                child: ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.delete_outline_rounded),
+                  title: Text(context.l10n.tr('removeRecords')),
+                ),
               ),
             ],
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 }

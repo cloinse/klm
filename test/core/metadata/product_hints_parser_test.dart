@@ -28,20 +28,34 @@ otros datos
 
     expect(metadata.name, 'Analog Dreams');
     expect(metadata.regKey, 'Analog Dreams');
-    expect(metadata.snpid, 'ABC');
+    expect(metadata.snpid, 'aBc');
     expect(metadata.visibility, 3);
     expect(metadata.minimumKontaktVersion, '7.2');
   });
 
-  test('normaliza el SNPID también en el XML de ProductHints', () {
+  test('preserva la capitalización del SNPID en metadata y ProductHints', () {
     const xml = '''
 <ProductHints><Product><Name>A</Name><RegKey>A</RegKey><SNPID>a1b</SNPID></Product></ProductHints>
 ''';
 
     final document = parser.parseDocumentText(xml);
 
-    expect(document.metadata.snpid, 'A1B');
-    expect(document.xml, contains('<SNPID>A1B</SNPID>'));
+    expect(document.metadata.snpid, 'a1b');
+    expect(document.xml, contains('<SNPID>a1b</SNPID>'));
+  });
+
+  test('preserva la declaración XML de ProductHints', () {
+    const xml = '''
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<ProductHints><Product><Name>A</Name><RegKey>A</RegKey><SNPID>a1b</SNPID></Product></ProductHints>
+''';
+
+    final document = parser.parseDocumentText(xml);
+
+    expect(
+      document.xml,
+      startsWith('<?xml version="1.0" encoding="UTF-8" standalone="no" ?>'),
+    );
   });
 
   test('uses ProductSpecific visibility for the Windows registry', () {

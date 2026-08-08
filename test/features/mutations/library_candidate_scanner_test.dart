@@ -10,7 +10,7 @@ void main() {
     final directory = await Directory.systemTemp.createTemp('klm-candidate-');
     addTearDown(() => directory.delete(recursive: true));
     await File('${directory.path}/Library.nicnt').writeAsString(
-      _productHints(name: 'Test Library', regKey: 'Test Library', snpid: 'ABC'),
+      _productHints(name: 'Test Library', regKey: 'Test Library', snpid: 'za6'),
     );
     await File('${directory.path}/Ignored_info.nkx').writeAsString(
       _productHints(name: 'Ignored', regKey: 'Ignored', snpid: 'DEF'),
@@ -20,9 +20,11 @@ void main() {
 
     expect(candidates, hasLength(1));
     expect(candidates.single.metadata.name, 'Test Library');
-    expect(candidates.single.metadata.snpid, 'ABC');
+    expect(candidates.single.metadata.snpid, 'za6');
     expect(candidates.single.metadataPath, endsWith('Library.nicnt'));
     expect(candidates.single.productHintsXml, contains('<ProductHints>'));
+    expect(candidates.single.productHintsXml, contains('<SNPID>za6</SNPID>'));
+    expect(candidates.single.toUpsertRequest()['snpid'], 'za6');
     expect(candidates.single.toUpsertRequest().keys, isNot(contains('target')));
   });
 

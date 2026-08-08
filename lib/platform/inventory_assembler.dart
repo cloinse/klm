@@ -48,7 +48,7 @@ class InventoryAssembler {
     match
       ..name = match.name.isEmpty ? cleanName : match.name
       ..regKey ??= cleanRegKey
-      ..snpid ??= _clean(snpid)?.toUpperCase()
+      ..snpid ??= _clean(snpid)
       ..contentPath ??= _clean(contentPath)
       ..minimumKontaktVersion ??= _clean(minimumKontaktVersion)
       ..visibility ??= visibility

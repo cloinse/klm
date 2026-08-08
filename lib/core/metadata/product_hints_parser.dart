@@ -39,6 +39,9 @@ class ProductHintsParser {
     final fragment = source
         .substring(start, end + endMarker.length)
         .replaceAll('\u0000', '');
+    final declaration = RegExp(
+      r'''<\?xml[^>]*\?>''',
+    ).firstMatch(source.substring(0, start))?.group(0);
 
     late final XmlDocument document;
     try {
@@ -57,7 +60,7 @@ class ProductHintsParser {
     final product = products.single;
     final name = _value(product, 'Name');
     final regKey = _value(product, 'RegKey');
-    final snpid = _value(product, 'SNPID').toUpperCase();
+    final snpid = _value(product, 'SNPID');
     if (name.isEmpty || regKey.isEmpty || snpid.isEmpty) {
       throw const ProductHintsException(
         'La metadata no contiene Name, RegKey y SNPID válidos.',
@@ -65,8 +68,6 @@ class ProductHintsParser {
     }
     _validateFilenameValue(name, 'Name');
     _validateFilenameValue(regKey, 'RegKey');
-    product.findAllElements('SNPID').first.innerText = snpid;
-
     String? minimumVersion;
     for (final application in product.findAllElements('Application')) {
       if (application.innerText.trim().toLowerCase() == 'kontakt') {
@@ -86,9 +87,10 @@ class ProductHintsParser {
       authSystem: _nullable(_value(product, 'AuthSystem')),
       minimumKontaktVersion: minimumVersion,
     );
+    final serializedXml = document.toXmlString(pretty: true, indent: '  ');
     return ProductHintsDocument(
       metadata: metadata,
-      xml: document.toXmlString(pretty: true, indent: '  '),
+      xml: declaration == null ? serializedXml : '$declaration\n$serializedXml',
     );
   }
 

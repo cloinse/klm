@@ -87,6 +87,67 @@ void main() {
     ]);
     expect(controller.hasUnsavedCustomOrder, isFalse);
   });
+
+  test(
+    'refresh restores a re-added library to its registered position',
+    () async {
+      final platform = _OrderPlatform();
+      final controller = LibraryInventoryController(platform);
+      addTearDown(controller.dispose);
+
+      await controller.refresh();
+      platform.libraries = const [
+        KontaktLibrary(id: 'beta', name: 'Beta', userListIndex: 2),
+        KontaktLibrary(id: 'gamma', name: 'Gamma', userListIndex: 3),
+      ];
+      await controller.refresh();
+
+      platform.libraries = const [
+        KontaktLibrary(id: 'alpha', name: 'Alpha', userListIndex: 1),
+        KontaktLibrary(id: 'beta', name: 'Beta', userListIndex: 2),
+        KontaktLibrary(id: 'gamma', name: 'Gamma', userListIndex: 3),
+      ];
+      await controller.refresh();
+
+      expect(controller.visibleLibraries.map((library) => library.name), [
+        'Alpha',
+        'Beta',
+        'Gamma',
+      ]);
+      expect(controller.hasUnsavedCustomOrder, isFalse);
+    },
+  );
+
+  test('removing a library compacts and saves the classic order', () async {
+    final platform = _OrderPlatform()
+      ..libraries = const [
+        KontaktLibrary(id: 'alpha', name: 'Alpha', userListIndex: 1),
+        KontaktLibrary(id: 'beta', name: 'Beta', userListIndex: 2),
+        KontaktLibrary(id: 'gamma', name: 'Gamma', userListIndex: 3),
+        KontaktLibrary(id: 'delta', name: 'Delta', userListIndex: 4),
+      ];
+    final controller = LibraryInventoryController(platform);
+    addTearDown(controller.dispose);
+
+    await controller.refresh();
+    await controller.removeLibrary(
+      controller.snapshot!.libraries.singleWhere(
+        (library) => library.id == 'beta',
+      ),
+    );
+
+    expect(platform.removedLibraryId, 'beta');
+    expect(platform.savedOrder?.map((library) => library.name), [
+      'Alpha',
+      'Gamma',
+      'Delta',
+    ]);
+    expect(
+      platform.libraries.map((library) => library.userListIndex),
+      [1, 2, 3],
+    );
+    expect(controller.hasUnsavedCustomOrder, isFalse);
+  });
 }
 
 class _OrderPlatform implements KontaktPlatform {
@@ -96,6 +157,7 @@ class _OrderPlatform implements KontaktPlatform {
     KontaktLibrary(id: 'gamma', name: 'Gamma', userListIndex: 1),
   ];
   List<KontaktLibrary>? savedOrder;
+  String? removedLibraryId;
 
   @override
   PlatformCapabilities get capabilities => const PlatformCapabilities(
@@ -148,8 +210,17 @@ class _OrderPlatform implements KontaktPlatform {
   ) => throw UnimplementedError();
 
   @override
-  Future<KontaktMutationResult> removeLibrary(KontaktLibrary library) =>
-      throw UnimplementedError();
+  Future<KontaktMutationResult> removeLibrary(KontaktLibrary library) async {
+    removedLibraryId = library.id;
+    libraries = libraries
+        .where((candidate) => candidate.id != library.id)
+        .toList(growable: false);
+    return KontaktMutationResult(
+      operation: KontaktMutationType.remove,
+      libraryName: library.name,
+      changedPaths: const [],
+    );
+  }
 
   @override
   Future<KontaktMutationResult> upsertLibrary(
