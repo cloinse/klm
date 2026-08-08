@@ -201,6 +201,7 @@ function Get-RegistryInventory {
           }
           $snpid = Get-RegistryValue $productKey 'SNPID'
           $contentPath = Get-RegistryValue $productKey 'ContentDir'
+          $visibility = Get-RegistryValue $productKey 'Visibility'
           $userListIndex = $null
           foreach ($candidate in @($regKey, $subKeyName)) {
             $candidateIdentity = $candidate.Trim().ToLowerInvariant()
@@ -218,6 +219,12 @@ function Get-RegistryInventory {
           }
           if ($null -ne $contentPath -and "$contentPath".Trim()) {
             $record.contentPath = "$contentPath".Trim()
+          }
+          if ($null -ne $visibility) {
+            $parsedVisibility = 0
+            if ([int]::TryParse("$visibility", [ref]$parsedVisibility)) {
+              $record.visibility = $parsedVisibility
+            }
           }
           if ($null -ne $userListIndex) {
             $parsedIndex = 0

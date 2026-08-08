@@ -1632,6 +1632,7 @@ class _DiagnosticsView extends StatelessWidget {
                               issue.code,
                               issue.message,
                               version: library.minimumKontaktVersion,
+                              visibility: library.visibility,
                             ),
                             severity: issue.severity,
                             suffix: library.snpid?.toUpperCase(),

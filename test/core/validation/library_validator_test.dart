@@ -39,4 +39,28 @@ void main() {
       isTrue,
     );
   });
+
+  test('detecta bibliotecas ocultas por Visibility', () {
+    const library = KontaktLibrary(
+      id: 'hidden',
+      name: 'Hidden Library',
+      regKey: 'Hidden Library',
+      snpid: 'HID',
+      contentPath: '/tmp',
+      visibility: 7,
+      sources: {
+        RegistrationSource.serviceCenter,
+        RegistrationSource.preferences,
+        RegistrationSource.installedProducts,
+      },
+    );
+
+    final result = validator.validate([library]).single;
+
+    expect(result.health, LibraryHealth.warning);
+    expect(
+      result.issues.map((issue) => issue.code),
+      contains('hidden_in_kontakt'),
+    );
+  });
 }

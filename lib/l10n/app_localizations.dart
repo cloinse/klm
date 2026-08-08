@@ -59,9 +59,17 @@ class AppLocalizations {
 
   String languageName(String tag) => tr('language_$tag');
 
-  String issueMessage(String code, String fallback, {String? version}) {
+  String issueMessage(
+    String code,
+    String fallback, {
+    String? version,
+    int? visibility,
+  }) {
     if (code == 'kontakt6_incompatible' && version != null) {
       return minimumVersion(version);
+    }
+    if (code == 'hidden_in_kontakt' && visibility != null) {
+      return format('issue_hidden_in_kontakt', {'visibility': visibility});
     }
     final key = 'issue_$code';
     final translated = tr(key);
@@ -219,6 +227,8 @@ class AppLocalizations {
       'issue_missing_legacy_registration':
           'The registration required by Kontakt 6 is missing.',
       'issue_missing_installed_product': 'The Kontakt 7/8 manifest is missing.',
+      'issue_hidden_in_kontakt':
+          'Kontakt is hiding this library (Visibility={visibility}). Repair its records to show it.',
       'issue_missing_content_path': 'The content path could not be determined.',
       'issue_content_offline':
           'The path does not exist or the drive is disconnected.',
@@ -373,6 +383,8 @@ class AppLocalizations {
       'issue_missing_legacy_registration':
           'Falta el registro requerido por Kontakt 6.',
       'issue_missing_installed_product': 'Falta el manifiesto de Kontakt 7/8.',
+      'issue_hidden_in_kontakt':
+          'Kontakt está ocultando esta librería (Visibility={visibility}). Repara sus registros para mostrarla.',
       'issue_missing_content_path':
           'No se pudo determinar la ruta del contenido.',
       'issue_content_offline':
@@ -528,6 +540,8 @@ class AppLocalizations {
           'O registro exigido pelo Kontakt 6 está ausente.',
       'issue_missing_installed_product':
           'O manifesto do Kontakt 7/8 está ausente.',
+      'issue_hidden_in_kontakt':
+          'O Kontakt está ocultando esta biblioteca (Visibility={visibility}). Repare os registros para mostrá-la.',
       'issue_missing_content_path':
           'Não foi possível determinar o caminho do conteúdo.',
       'issue_content_offline':

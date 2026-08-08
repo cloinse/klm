@@ -187,6 +187,7 @@ class MacOSKontaktPlatform implements KontaktPlatform {
           regKey: _stringValue(object, const ['RegKey', 'regKey']),
           snpid: snpid,
           contentPath: _stringValue(object, const ['ContentDir', 'contentDir']),
+          visibility: _intValue(object, const ['Visibility', 'visibility']),
           source: RegistrationSource.preferences,
         );
       } catch (_) {
@@ -242,6 +243,15 @@ class MacOSKontaktPlatform implements KontaktPlatform {
     for (final key in keys) {
       final value = object[key];
       if (value is String && value.trim().isNotEmpty) return value.trim();
+    }
+    return null;
+  }
+
+  int? _intValue(Map<String, dynamic> object, List<String> keys) {
+    for (final key in keys) {
+      final value = object[key];
+      if (value is num) return value.toInt();
+      if (value is String) return int.tryParse(value.trim());
     }
     return null;
   }

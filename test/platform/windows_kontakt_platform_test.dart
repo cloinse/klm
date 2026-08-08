@@ -26,6 +26,7 @@ void main() {
     expect(platform, isNot(contains('_classicOrderUnsupported')));
     expect(helper, contains("'inventory', 'mutation', 'classicOrder'"));
     expect(helper, contains('Get-UserListIndexes'));
+    expect(helper, contains('\$record.visibility = \$parsedVisibility'));
     expect(helper, contains('RegistryHive]::CurrentUser'));
     expect(helper, contains('UserListIndex = \$entry.Index'));
     expect(helper, contains('browserLibsAZSort = 0'));

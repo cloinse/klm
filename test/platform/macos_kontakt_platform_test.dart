@@ -39,6 +39,7 @@ void main() {
   <key>RegKey</key><string>Analog Dreams</string>
   <key>SNPID</key><string>ABC</string>
   <key>ContentDir</key><string>${content.path}</string>
+  <key>Visibility</key><integer>3</integer>
 </dict></plist>
 ''');
     await File(
@@ -62,6 +63,7 @@ void main() {
     final library = snapshot.libraries.single;
     expect(library.name, 'Analog Dreams');
     expect(library.contentPath, content.path);
+    expect(library.visibility, 3);
     expect(library.registeredForKontakt6, isTrue);
     expect(library.registeredForKontakt78, isTrue);
     expect(library.health, LibraryHealth.healthy);

@@ -198,6 +198,7 @@ class WindowsKontaktPlatform implements KontaktPlatform {
           regKey: regKey,
           snpid: snpid,
           contentPath: contentPath,
+          visibility: _intValue(record['visibility']),
           userListIndex: record['userListIndex'] as int?,
           source: RegistrationSource.windowsRegistry,
         );
@@ -215,6 +216,12 @@ class WindowsKontaktPlatform implements KontaktPlatform {
     } finally {
       await temporaryDirectory.delete(recursive: true);
     }
+  }
+
+  int? _intValue(Object? value) {
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value.trim());
+    return null;
   }
 
   @override

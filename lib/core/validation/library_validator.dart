@@ -52,6 +52,18 @@ class LibraryValidator {
               ),
             );
           }
+          if (library.visibility != null && library.visibility != 3) {
+            issues.add(
+              LibraryIssue(
+                code: 'hidden_in_kontakt',
+                message:
+                    'Kontakt oculta esta librería '
+                    '(Visibility=${library.visibility}). '
+                    'Repara sus registros para mostrarla.',
+                severity: IssueSeverity.warning,
+              ),
+            );
+          }
           if (path == null || path.isEmpty) {
             issues.add(
               const LibraryIssue(

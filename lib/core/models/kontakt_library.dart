@@ -41,6 +41,7 @@ class KontaktLibrary {
     this.snpid,
     this.contentPath,
     this.minimumKontaktVersion,
+    this.visibility,
     this.userListIndex,
     this.sources = const <RegistrationSource>{},
     this.issues = const <LibraryIssue>[],
@@ -52,6 +53,7 @@ class KontaktLibrary {
   final String? snpid;
   final String? contentPath;
   final String? minimumKontaktVersion;
+  final int? visibility;
   final int? userListIndex;
   final Set<RegistrationSource> sources;
   final List<LibraryIssue> issues;
@@ -100,6 +102,7 @@ class KontaktLibrary {
     String? snpid,
     String? contentPath,
     String? minimumKontaktVersion,
+    int? visibility,
     int? userListIndex,
     Set<RegistrationSource>? sources,
     List<LibraryIssue>? issues,
@@ -112,6 +115,7 @@ class KontaktLibrary {
       contentPath: contentPath ?? this.contentPath,
       minimumKontaktVersion:
           minimumKontaktVersion ?? this.minimumKontaktVersion,
+      visibility: visibility ?? this.visibility,
       userListIndex: userListIndex ?? this.userListIndex,
       sources: sources ?? this.sources,
       issues: issues ?? this.issues,

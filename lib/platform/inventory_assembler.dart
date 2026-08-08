@@ -21,6 +21,7 @@ class InventoryAssembler {
     String? snpid,
     String? contentPath,
     String? minimumKontaktVersion,
+    int? visibility,
     int? userListIndex,
     required RegistrationSource source,
     List<LibraryIssue> issues = const <LibraryIssue>[],
@@ -50,6 +51,7 @@ class InventoryAssembler {
       ..snpid ??= _clean(snpid)?.toUpperCase()
       ..contentPath ??= _clean(contentPath)
       ..minimumKontaktVersion ??= _clean(minimumKontaktVersion)
+      ..visibility ??= visibility
       ..userListIndex ??= userListIndex
       ..sources.add(source)
       ..issues.addAll(issues);
@@ -66,6 +68,7 @@ class InventoryAssembler {
             snpid: item.snpid,
             contentPath: item.contentPath,
             minimumKontaktVersion: item.minimumKontaktVersion,
+            visibility: item.visibility,
             userListIndex: item.userListIndex,
             sources: Set<RegistrationSource>.unmodifiable(item.sources),
             issues: List<LibraryIssue>.unmodifiable(item.issues),
@@ -90,6 +93,7 @@ class _MutableLibrary {
   String? snpid;
   String? contentPath;
   String? minimumKontaktVersion;
+  int? visibility;
   int? userListIndex;
   final Set<RegistrationSource> sources = <RegistrationSource>{};
   final List<LibraryIssue> issues = <LibraryIssue>[];
