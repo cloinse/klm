@@ -4,15 +4,15 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     <channel>
         <title>Kontakt Library Manager</title>
         <item>
-            <title>0.2.0</title>
-            <pubDate>Sat, 08 Aug 2026 01:46:09 +0000</pubDate>
-            <sparkle:version>12</sparkle:version>
-            <sparkle:shortVersionString>0.2.0</sparkle:shortVersionString>
+            <title>0.2.1</title>
+            <pubDate>Sat, 08 Aug 2026 03:55:21 +0000</pubDate>
+            <sparkle:version>13</sparkle:version>
+            <sparkle:shortVersionString>0.2.1</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>10.15</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/cloinse/klm/releases/download/v0.2.0/klm-macos-v0.2.0.dmg" length="21307211" type="application/octet-stream" sparkle:edSignature="iOtwejBbql+ZIkMe+wLPjmNZcDEBEwEipcyzFJCRIf6sl2fBMUgvICbEVQrrW7d+SsuqW5L8D7DoMZU1VdZNAg=="></enclosure>
+            <enclosure url="https://github.com/cloinse/klm/releases/download/v0.2.1/klm-macos-v0.2.1.dmg" length="21307718" type="application/octet-stream" sparkle:edSignature="0ejuA35VGefeDO4lSVcpwRcZGmen2z66NgYoscXt4QJjJ8mkNtIrl5s0eAu2wuSppRd1kjUOR2cN+QTVGFXiDw=="></enclosure>
         </item>
     </channel>
 </rss><!-- sparkle-signatures:
-edSignature: On73JSUUrmuVAU9/TKoJoiM1dBePhHPqHzad1297aaeaw7CqgoeoDrQpxP3+I4rWeMQv8dkgjt8cIPcLxvloDw==
+edSignature: s5KWYycCtX510+WI3aC78HNeeC9sp0cz6rG1NmG4Vnis5NxHxInLngu/MkXmWO6zxev6Kyg7yI8D7NEXiayLDw==
 length: 1055
 -->
