@@ -11,19 +11,25 @@ import 'package:kontakt_library_manager/core/validation/library_validator.dart';
 import 'package:kontakt_library_manager/features/mutations/library_candidate_scanner.dart';
 import 'package:kontakt_library_manager/platform/inventory_assembler.dart';
 import 'package:kontakt_library_manager/platform/kontakt_platform.dart';
+import 'package:kontakt_library_manager/platform/windows/windows_portable_settings.dart';
 
 class WindowsKontaktPlatform implements KontaktPlatform {
   WindowsKontaktPlatform({
     ProductHintsParser parser = const ProductHintsParser(),
     LibraryValidator validator = const LibraryValidator(),
     LibraryCandidateScanner candidateScanner = const LibraryCandidateScanner(),
+    WindowsPortableSupport? portableSupport,
   }) : _parser = parser,
        _validator = validator,
-       _candidateScanner = candidateScanner;
+       _candidateScanner = candidateScanner,
+       portableSupport = portableSupport ?? WindowsPortableSupport();
 
   final ProductHintsParser _parser;
   final LibraryValidator _validator;
   final LibraryCandidateScanner _candidateScanner;
+  final WindowsPortableSupport portableSupport;
+
+  bool get _portableMode => portableSupport.enabled;
 
   @override
   PlatformCapabilities get capabilities => const PlatformCapabilities(
@@ -36,6 +42,12 @@ class WindowsKontaktPlatform implements KontaktPlatform {
 
   @override
   Future<InventorySnapshot> scanLibraries() async {
+    if (_portableMode) return _scanPortableLibraries();
+
+    return _scanStandardLibraries();
+  }
+
+  Future<InventorySnapshot> _scanStandardLibraries() async {
     final assembler = InventoryAssembler();
     final diagnostics = <InventoryDiagnostic>[];
     final knownRegKeys = <String>{};
@@ -60,6 +72,62 @@ class WindowsKontaktPlatform implements KontaktPlatform {
       knownRegKeys,
     );
     await _readRegistry(assembler, diagnostics, knownRegKeys);
+
+    final libraries = _validator.validate(assembler.build())
+      ..sort(
+        (left, right) =>
+            left.name.toLowerCase().compareTo(right.name.toLowerCase()),
+      );
+    return InventorySnapshot(
+      libraries: libraries,
+      diagnostics: diagnostics,
+      scannedAt: DateTime.now(),
+    );
+  }
+
+  Future<InventorySnapshot> _scanPortableLibraries() async {
+    final assembler = InventoryAssembler();
+    final diagnostics = <InventoryDiagnostic>[];
+    final rootPath = portableSupport.rootPath;
+    if (rootPath == null || rootPath.trim().isEmpty) {
+      diagnostics.add(
+        const InventoryDiagnostic(
+          code: 'portable_path_missing',
+          title: 'Ruta de Kontakt Portable no configurada',
+          message: 'Selecciona la carpeta de Kontakt Portable en Ajustes.',
+          severity: IssueSeverity.error,
+        ),
+      );
+    } else {
+      try {
+        final store = PortableSettingsStore(rootPath);
+        final records = await store.readRecords();
+        for (final record in records) {
+          final rawPath = record.contentPath;
+          assembler.add(
+            name: record.name,
+            regKey: record.section,
+            snpid: record.snpid,
+            contentPath: rawPath == null
+                ? null
+                : store.resolveContentPath(rawPath),
+            visibility: record.visibility,
+            userListIndex: record.userListIndex,
+            source: RegistrationSource.portableSettings,
+          );
+        }
+      } catch (error) {
+        diagnostics.add(
+          InventoryDiagnostic(
+            code: 'portable_settings_failed',
+            title: 'No se pudo leer Kontakt Portable',
+            message: error.toString(),
+            severity: IssueSeverity.error,
+            detail: error.toString(),
+          ),
+        );
+      }
+    }
 
     final libraries = _validator.validate(assembler.build())
       ..sort(
@@ -234,6 +302,17 @@ class WindowsKontaktPlatform implements KontaktPlatform {
 
   @override
   Future<void> saveClassicLibraryOrder(List<KontaktLibrary> libraries) async {
+    if (_portableMode) {
+      final rootPath = portableSupport.rootPath;
+      if (rootPath == null) {
+        throw const PortableSettingsException(
+          'La ruta de Kontakt Portable no está configurada.',
+        );
+      }
+      await PortableSettingsStore(rootPath).saveClassicOrder(libraries);
+      return;
+    }
+
     if (libraries.length > 10000) {
       throw const FormatException('The classic Kontakt order is too large.');
     }
@@ -295,7 +374,7 @@ class WindowsKontaktPlatform implements KontaktPlatform {
 
   @override
   Future<PrivilegedHelperStatus> privilegedHelperStatus() async =>
-      await _helperFile.exists()
+      _portableMode || await _helperFile.exists()
       ? PrivilegedHelperStatus.enabled
       : PrivilegedHelperStatus.unavailable;
 
@@ -303,18 +382,65 @@ class WindowsKontaktPlatform implements KontaktPlatform {
   Future<KontaktMutationResult> relocateLibrary(
     KontaktLibrary library,
     String contentPath,
-  ) => _executeMutation(
-    KontaktMutationRequest.relocate(library, contentPath).payload,
-  );
+  ) async {
+    if (_portableMode) {
+      final rootPath = portableSupport.rootPath;
+      if (rootPath == null) {
+        throw const PortableSettingsException(
+          'La ruta de Kontakt Portable no está configurada.',
+        );
+      }
+      await PortableSettingsStore(rootPath).relocate(library, contentPath);
+      return KontaktMutationResult(
+        operation: KontaktMutationType.relocate,
+        libraryName: library.name,
+        changedPaths: [PortableSettingsStore(rootPath).settingsPath],
+      );
+    }
+    return _executeMutation(
+      KontaktMutationRequest.relocate(library, contentPath).payload,
+    );
+  }
 
   @override
-  Future<KontaktMutationResult> removeLibrary(KontaktLibrary library) =>
-      _executeMutation(KontaktMutationRequest.remove(library).payload);
+  Future<KontaktMutationResult> removeLibrary(KontaktLibrary library) async {
+    if (_portableMode) {
+      final rootPath = portableSupport.rootPath;
+      if (rootPath == null) {
+        throw const PortableSettingsException(
+          'La ruta de Kontakt Portable no está configurada.',
+        );
+      }
+      await PortableSettingsStore(rootPath).remove(library);
+      return KontaktMutationResult(
+        operation: KontaktMutationType.remove,
+        libraryName: library.name,
+        changedPaths: [PortableSettingsStore(rootPath).settingsPath],
+      );
+    }
+    return _executeMutation(KontaktMutationRequest.remove(library).payload);
+  }
 
   @override
   Future<KontaktMutationResult> upsertLibrary(
     KontaktLibraryCandidate candidate,
-  ) => _executeMutation(candidate.toUpsertRequest());
+  ) async {
+    if (_portableMode) {
+      final rootPath = portableSupport.rootPath;
+      if (rootPath == null) {
+        throw const PortableSettingsException(
+          'La ruta de Kontakt Portable no está configurada.',
+        );
+      }
+      await PortableSettingsStore(rootPath).upsert(candidate);
+      return KontaktMutationResult(
+        operation: KontaktMutationType.upsert,
+        libraryName: candidate.metadata.name,
+        changedPaths: [PortableSettingsStore(rootPath).settingsPath],
+      );
+    }
+    return _executeMutation(candidate.toUpsertRequest());
+  }
 
   File get _helperFile => File(
     '${File(Platform.resolvedExecutable).parent.path}'

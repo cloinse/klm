@@ -24,8 +24,11 @@ class LibraryValidator {
         .map((library) {
           final issues = <LibraryIssue>[...library.issues];
           final path = library.contentPath;
+          final hasPortableRegistration = library.sources.contains(
+            RegistrationSource.portableSettings,
+          );
 
-          if (!library.hasServiceCenter) {
+          if (!library.hasServiceCenter && !hasPortableRegistration) {
             issues.add(
               const LibraryIssue(
                 code: 'missing_service_center',
@@ -34,7 +37,7 @@ class LibraryValidator {
               ),
             );
           }
-          if (!library.hasLegacyRegistration) {
+          if (!library.hasLegacyRegistration && !hasPortableRegistration) {
             issues.add(
               const LibraryIssue(
                 code: 'missing_legacy_registration',
@@ -43,7 +46,7 @@ class LibraryValidator {
               ),
             );
           }
-          if (!library.hasInstalledProduct) {
+          if (!library.hasInstalledProduct && !hasPortableRegistration) {
             issues.add(
               const LibraryIssue(
                 code: 'missing_installed_product',

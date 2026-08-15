@@ -43,13 +43,17 @@ class LibraryInventoryController extends ChangeNotifier {
   PrivilegedHelperStatus helperStatus = PrivilegedHelperStatus.unavailable;
   bool mutationInProgress = false;
   bool orderSaveInProgress = false;
+  bool _refreshQueued = false;
   bool _customOrderInitialized = false;
   final List<String> _customLibraryIds = <String>[];
   List<String> _savedCustomLibraryIds = const <String>[];
   final List<OperationLog> logs = <OperationLog>[];
 
   Future<void> refresh() async {
-    if (state == InventoryLoadState.loading) return;
+    if (state == InventoryLoadState.loading) {
+      _refreshQueued = true;
+      return;
+    }
     state = InventoryLoadState.loading;
     lastError = null;
     notifyListeners();
@@ -64,6 +68,11 @@ class LibraryInventoryController extends ChangeNotifier {
       lastError = error;
       state = InventoryLoadState.failure;
       _log('inventory_error', error.toString(), isError: true);
+    }
+    if (_refreshQueued) {
+      _refreshQueued = false;
+      await refresh();
+      return;
     }
     notifyListeners();
   }

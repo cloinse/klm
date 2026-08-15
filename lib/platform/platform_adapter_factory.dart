@@ -5,10 +5,15 @@ import 'package:kontakt_library_manager/core/models/kontakt_mutation.dart';
 import 'package:kontakt_library_manager/platform/kontakt_platform.dart';
 import 'package:kontakt_library_manager/platform/macos/macos_kontakt_platform.dart';
 import 'package:kontakt_library_manager/platform/windows/windows_kontakt_platform.dart';
+import 'package:kontakt_library_manager/platform/windows/windows_portable_settings.dart';
 
-KontaktPlatform createKontaktPlatform() {
+KontaktPlatform createKontaktPlatform({
+  WindowsPortableSupport? portableSupport,
+}) {
   if (Platform.isMacOS) return MacOSKontaktPlatform();
-  if (Platform.isWindows) return WindowsKontaktPlatform();
+  if (Platform.isWindows) {
+    return WindowsKontaktPlatform(portableSupport: portableSupport);
+  }
   return UnsupportedKontaktPlatform(Platform.operatingSystem);
 }
 

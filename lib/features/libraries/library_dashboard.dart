@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:file_selector_platform_interface/file_selector_platform_interface.dart';
 import 'package:kontakt_library_manager/core/models/kontakt_library.dart';
 import 'package:kontakt_library_manager/core/models/kontakt_mutation.dart';
 import 'package:kontakt_library_manager/features/libraries/library_inventory_controller.dart';
@@ -11,6 +12,7 @@ import 'package:kontakt_library_manager/platform/app_update_platform.dart';
 import 'package:kontakt_library_manager/platform/feedback_service.dart';
 import 'package:kontakt_library_manager/theme/app_theme.dart';
 import 'package:kontakt_library_manager/theme/theme_controller.dart';
+import 'package:kontakt_library_manager/platform/windows/windows_portable_settings.dart';
 
 enum DashboardSection { library, diagnostics, activity, settings }
 
@@ -22,6 +24,7 @@ class LibraryDashboard extends StatefulWidget {
     required this.themeController,
     required this.updatePlatform,
     required this.feedbackService,
+    this.portableSupport,
   });
 
   final LibraryInventoryController controller;
@@ -29,6 +32,7 @@ class LibraryDashboard extends StatefulWidget {
   final ThemeController themeController;
   final AppUpdatePlatform updatePlatform;
   final FeedbackService feedbackService;
+  final WindowsPortableSupport? portableSupport;
 
   @override
   State<LibraryDashboard> createState() => _LibraryDashboardState();
@@ -209,6 +213,7 @@ class _LibraryDashboardState extends State<LibraryDashboard> {
       updatePlatform: widget.updatePlatform,
       feedbackService: widget.feedbackService,
       onCheckForUpdates: _checkForUpdates,
+      portableSupport: widget.portableSupport,
     ),
   };
 }
@@ -1783,6 +1788,7 @@ class _SettingsView extends StatelessWidget {
     required this.updatePlatform,
     required this.feedbackService,
     required this.onCheckForUpdates,
+    this.portableSupport,
   });
 
   final LocaleController localeController;
@@ -1790,6 +1796,7 @@ class _SettingsView extends StatelessWidget {
   final AppUpdatePlatform updatePlatform;
   final FeedbackService feedbackService;
   final Future<void> Function() onCheckForUpdates;
+  final WindowsPortableSupport? portableSupport;
 
   @override
   Widget build(BuildContext context) {
@@ -1804,6 +1811,10 @@ class _SettingsView extends StatelessWidget {
           const SizedBox(height: 14),
           _ThemeSettingsCard(themeController: themeController),
           const SizedBox(height: 14),
+          if (Platform.isWindows && portableSupport != null) ...[
+            _PortableSettingsCard(support: portableSupport!),
+            const SizedBox(height: 14),
+          ],
           _UpdateSettingsCard(
             updatePlatform: updatePlatform,
             onCheckForUpdates: onCheckForUpdates,
@@ -1851,6 +1862,96 @@ class _LanguageSettingsCard extends StatelessWidget {
           onChanged: (language) {
             if (language != null) localeController.setLanguage(language);
           },
+        ),
+      ),
+    );
+  }
+}
+
+class _PortableSettingsCard extends StatelessWidget {
+  const _PortableSettingsCard({required this.support});
+
+  final WindowsPortableSupport support;
+
+  Future<void> _toggle(BuildContext context, bool enabled) async {
+    if (!enabled) {
+      await support.configure(enabled: false);
+      return;
+    }
+    if (support.rootPath == null) {
+      await _chooseRoot(context, enableAfterSelection: true);
+    } else {
+      await support.configure(enabled: true);
+    }
+  }
+
+  Future<void> _chooseRoot(
+    BuildContext context, {
+    bool enableAfterSelection = false,
+  }) async {
+    const options = FileDialogOptions(canCreateDirectories: false);
+    final selected = await FileSelectorPlatform.instance
+        .getDirectoryPathWithOptions(options);
+    if (selected == null || !context.mounted) return;
+
+    final settingsPath =
+        '$selected${Platform.pathSeparator}UserData${Platform.pathSeparator}Settings.cfg';
+    if (!File(settingsPath).existsSync()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.tr('portableInvalidPath'))),
+      );
+      return;
+    }
+
+    await support.configure(
+      enabled: enableAfterSelection || support.enabled,
+      rootPath: selected,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: support,
+      builder: (context, _) => _SettingsCard(
+        icon: Icons.usb_rounded,
+        title: context.l10n.tr('portableSection'),
+        description: context.l10n.tr('portableDescription'),
+        child: SizedBox(
+          width: 310,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              CheckboxListTile(
+                key: const ValueKey('portable-support-checkbox'),
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                value: support.enabled,
+                onChanged: (value) {
+                  if (value != null) _toggle(context, value);
+                },
+                title: Text(context.l10n.tr('portableEnable')),
+              ),
+              OutlinedButton.icon(
+                key: const ValueKey('portable-path-button'),
+                onPressed: () => _chooseRoot(context),
+                icon: const Icon(Icons.folder_open_outlined, size: 18),
+                label: Text(context.l10n.tr('portableChoosePath')),
+              ),
+              if (support.rootPath != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  support.rootPath!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: context.klmColors.secondaryText,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );

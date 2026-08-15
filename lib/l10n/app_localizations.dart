@@ -197,6 +197,13 @@ class AppLocalizations {
       'theme_system': 'System',
       'theme_light': 'Light',
       'theme_dark': 'Dark',
+      'portableSection': 'Kontakt Portable',
+      'portableDescription':
+          'Use only the libraries registered by the selected portable copy.',
+      'portableEnable': 'Use Kontakt Portable libraries',
+      'portableChoosePath': 'Select portable folder',
+      'portableInvalidPath':
+          'The selected folder does not contain UserData/Settings.cfg.',
       'updatesSection': 'Application updates',
       'updatesDescription': 'Updates are checked only while the app is open.',
       'updatesDescriptionWithVersion':
@@ -369,6 +376,13 @@ class AppLocalizations {
       'theme_system': 'Sistema',
       'theme_light': 'Claro',
       'theme_dark': 'Oscuro',
+      'portableSection': 'Kontakt Portable',
+      'portableDescription':
+          'Muestra únicamente las librerías registradas por la copia portable seleccionada.',
+      'portableEnable': 'Usar las librerías de Kontakt Portable',
+      'portableChoosePath': 'Seleccionar carpeta portable',
+      'portableInvalidPath':
+          'La carpeta seleccionada no contiene UserData/Settings.cfg.',
       'updatesSection': 'Actualizaciones de la aplicación',
       'updatesDescription':
           'Las actualizaciones solo se comprueban mientras la aplicación está abierta.',
@@ -545,6 +559,13 @@ class AppLocalizations {
       'theme_system': 'Sistema',
       'theme_light': 'Claro',
       'theme_dark': 'Escuro',
+      'portableSection': 'Kontakt Portable',
+      'portableDescription':
+          'Mostra somente as bibliotecas registradas pela cópia portátil selecionada.',
+      'portableEnable': 'Usar bibliotecas do Kontakt Portable',
+      'portableChoosePath': 'Selecionar pasta portátil',
+      'portableInvalidPath':
+          'A pasta selecionada não contém UserData/Settings.cfg.',
       'updatesSection': 'Atualizações do aplicativo',
       'updatesDescription':
           'As atualizações são verificadas somente enquanto o aplicativo está aberto.',

@@ -9,6 +9,7 @@ import 'package:kontakt_library_manager/platform/feedback_service.dart';
 import 'package:kontakt_library_manager/platform/kontakt_platform.dart';
 import 'package:kontakt_library_manager/theme/app_theme.dart';
 import 'package:kontakt_library_manager/theme/theme_controller.dart';
+import 'package:kontakt_library_manager/platform/windows/windows_portable_settings.dart';
 
 class KontaktLibraryManagerApp extends StatefulWidget {
   const KontaktLibraryManagerApp({
@@ -18,6 +19,7 @@ class KontaktLibraryManagerApp extends StatefulWidget {
     this.themeController,
     this.updatePlatform,
     this.feedbackService,
+    this.portableSupport,
   });
 
   final KontaktPlatform platform;
@@ -25,6 +27,7 @@ class KontaktLibraryManagerApp extends StatefulWidget {
   final ThemeController? themeController;
   final AppUpdatePlatform? updatePlatform;
   final FeedbackService? feedbackService;
+  final WindowsPortableSupport? portableSupport;
 
   @override
   State<KontaktLibraryManagerApp> createState() =>
@@ -50,10 +53,16 @@ class _KontaktLibraryManagerAppState extends State<KontaktLibraryManagerApp> {
     _updatePlatform = widget.updatePlatform ?? createAppUpdatePlatform();
     _feedbackService = widget.feedbackService ?? const HttpFeedbackService();
     _controller = LibraryInventoryController(widget.platform)..refresh();
+    widget.portableSupport?.addListener(_portableSupportChanged);
+  }
+
+  void _portableSupportChanged() {
+    _controller.refresh();
   }
 
   @override
   void dispose() {
+    widget.portableSupport?.removeListener(_portableSupportChanged);
     _controller.dispose();
     if (_ownsLocaleController) _localeController.dispose();
     if (_ownsThemeController) _themeController.dispose();
@@ -63,7 +72,11 @@ class _KontaktLibraryManagerAppState extends State<KontaktLibraryManagerApp> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge([_localeController, _themeController]),
+      listenable: Listenable.merge([
+        _localeController,
+        _themeController,
+        if (widget.portableSupport != null) widget.portableSupport!,
+      ]),
       builder: (context, _) => MaterialApp(
         debugShowCheckedModeBanner: false,
         onGenerateTitle: (context) => context.l10n.appTitle,
@@ -84,6 +97,7 @@ class _KontaktLibraryManagerAppState extends State<KontaktLibraryManagerApp> {
           themeController: _themeController,
           updatePlatform: _updatePlatform,
           feedbackService: _feedbackService,
+          portableSupport: widget.portableSupport,
         ),
       ),
     );

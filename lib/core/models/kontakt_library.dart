@@ -5,6 +5,7 @@ enum RegistrationSource {
   preferences,
   installedProducts,
   windowsRegistry,
+  portableSettings,
 }
 
 enum IssueSeverity { information, warning, error }
