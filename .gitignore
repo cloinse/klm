@@ -36,7 +36,7 @@ migrate_working_dir/
 
 # Cloudflare Wrangler local state and local admin credentials
 .wrangler/
-tools/feedback-admin/.dev.vars
+backend/.dev.vars
 *.cpuprofile
 
 # Symbolication related
