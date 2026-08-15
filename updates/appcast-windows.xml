@@ -3,12 +3,12 @@
   <channel>
     <title>Kontakt Library Manager - Windows</title>
     <item>
-      <title>0.2.2</title>
-      <pubDate>Sat, 08 Aug 2026 19:55:51 GMT</pubDate>
-      <sparkle:version>14</sparkle:version>
-      <sparkle:shortVersionString>0.2.2</sparkle:shortVersionString>
+      <title>0.2.3</title>
+      <pubDate>Sat, 15 Aug 2026 20:11:34 GMT</pubDate>
+      <sparkle:version>15</sparkle:version>
+      <sparkle:shortVersionString>0.2.3</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>10.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/cloinse/klm/releases/download/v0.2.2/klm-windows-v0.2.2.exe" length="14752982" type="application/octet-stream" sparkle:os="windows-x64" sparkle:installerArguments="/SILENT /SP- /NOICONS /NORESTART" sparkle:edSignature="WTJB6rf/QoDcFJBLiJWwDQfO1JVM8VS7Tr/BB/NIRiosylvpJ0YbGL/pX/zy7ZY0z/ggP0DERYgfFHPW1kl+BQ==" />
+      <enclosure url="https://github.com/cloinse/klm/releases/download/v0.2.3/klm-windows-v0.2.3.exe" length="14769635" type="application/octet-stream" sparkle:os="windows-x64" sparkle:installerArguments="/SILENT /SP- /NOICONS /NORESTART" sparkle:edSignature="aBpoUfqvKBcgpRwQ0MeliZCXbP9L7clckHn+ekL7XbBiL3rn32JOHXLYJivrcuYRu+ClZH96J6G/LnYPn83RDw==" />
     </item>
   </channel>
 </rss>
