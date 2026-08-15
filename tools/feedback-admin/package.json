@@ -1,0 +1,8 @@
+{
+  "name": "klm-feedback-admin-local",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev --config wrangler.jsonc",
+    "check": "wrangler deploy --config wrangler.jsonc --dry-run"
+  }
+}

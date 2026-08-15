@@ -34,6 +34,11 @@ migrate_working_dir/
 /coverage/
 .secrets/
 
+# Cloudflare Wrangler local state and local admin credentials
+.wrangler/
+tools/feedback-admin/.dev.vars
+*.cpuprofile
+
 # Symbolication related
 app.*.symbols
 
