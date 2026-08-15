@@ -1,92 +1,132 @@
 # Kontakt Library Manager
 
-Aplicación Flutter de escritorio para inventariar y diagnosticar librerías de
-Kontakt en macOS y Windows.
+Kontakt Library Manager (KLM) is a Flutter desktop application for inventorying,
+diagnosing, and organizing Native Instruments Kontakt libraries on macOS and
+Windows.
 
-## Estado actual
+## What it does
 
-El inventario y los diagnósticos son funcionales en ambas plataformas:
+KLM focuses on Kontakt's classic library browser. It combines the metadata and
+registration sources available on each platform into one inventory and reports
+problems that can prevent Kontakt from finding or displaying a library.
 
-- Usa inglés de forma predeterminada y permite seleccionar español o portugués
-  de Brasil desde Settings. La selección se aplica inmediatamente y se guarda.
-- Reconcilia XML de Service Center, PLIST de macOS y JSON de
-  `installed_products`.
-- Muestra el SNPID normalizado de cada librería y reserva el indicador de estado
-  para sus diagnósticos generales.
-- Detecta registros incompletos, rutas perdidas, discos desconectados, SNPID
-  duplicados y rutas compartidas.
-- Permite buscar, filtrar, ordenar y mostrar el contenido en Finder/Explorador.
-- Conserva un registro de operaciones y errores durante la sesión.
-- Se centra exclusivamente en el navegador clásico de Kontakt. Lee el orden
-  `UserListIndex`, permite reorganizar librerías mediante arrastre y guarda los
-  cambios en las preferencias del usuario de macOS o en `HKCU` de Windows sin
-  autorización administrativa.
-- En Windows reconcilia XML, JSON y las vistas de 32/64 bits del Registro. Las
-  altas, reparaciones, reubicaciones y eliminaciones se ejecutan mediante un
-  helper puntual que solicita UAC únicamente al confirmar cada cambio.
+### Inventory and diagnostics
 
-Los flujos de alta individual y por lote, reparación, reubicación y eliminación
-exclusiva de registros se canalizan a componentes incluidos con la aplicación.
-Al confirmar un cambio, el sistema muestra su diálogo normal de administrador,
-ejecuta una sola transacción y cierra el componente inmediatamente. La app
-Flutter no se ejecuta como administrador y los helpers no aceptan rutas de
-destino arbitrarias.
+- Reads Service Center XML, macOS property lists, and installed-products JSON.
+- Reconciles Windows XML, JSON, and both 32-bit and 64-bit Registry views.
+- Detects missing metadata, missing paths, disconnected volumes, duplicate
+  SNPIDs, and shared library paths.
+- Displays normalized SNPIDs and keeps diagnostic state separate from library
+  identity.
 
-Ni la aplicación ni el helper son procesos residentes. No se instala ningún
-LaunchDaemon, servicio XPC, Ítem de inicio ni componente de fondo. La aplicación
-termina al cerrar su última ventana y el helper existe únicamente mientras se
-aplica una operación confirmada. Tampoco se abre Terminal ni se invoca `sudo`.
+### Library management
 
-Las versiones Release se distribuyen en un DMG visual con la aplicación, una
-flecha de instalación y un enlace a Applications; solo pueden ejecutarse desde
-`/Applications`. Las actualizaciones de macOS usan Sparkle con firma Ed25519 y
-firma ad-hoc del bundle. KLM hace una comprobación silenciosa al abrirse y
-muestra un aviso cuando hay una nueva versión; la descarga e instalación solo
-se inicia por decisión del usuario. No mantiene procesos cuando KLM está
-cerrada. El procedimiento de publicación está documentado en
-[`docs/updates.md`](docs/updates.md).
+- Search, filter, and sort the inventory.
+- Open a library in Finder or Windows Explorer.
+- Reorder classic Kontakt libraries by changing their `UserListIndex` values.
+- Add, repair, relocate, or remove library registrations individually or in
+  batches.
+- Preserve a session log of operations and errors.
 
-La misma estrategia puntual se conserva en la compilación compatible con macOS
-10.15 mediante el workflow `macos-catalina-legacy` de Codemagic. El proyecto
-local permanece en macOS 12; únicamente el checkout temporal de CI cambia el
-deployment target. La matriz está documentada en
-[`docs/build-matrix.md`](docs/build-matrix.md).
+### User experience
 
-## Desarrollo
+- English is the default language, with Spanish and Brazilian Portuguese also
+  available from Settings.
+- Includes a built-in feedback form for bug reports, suggestions, and questions
+  without requiring a user account.
+- Supports update notifications and user-confirmed installation of new releases.
 
-```sh
-flutter pub get
-flutter analyze
-flutter test
-flutter run -d macos
-```
+## Safety model
 
-Para crear el DMG local después de una compilación Release:
+KLM is not an administrator process and does not install a background service,
+LaunchDaemon, XPC service, login item, or other resident component.
 
-```sh
-tool/package_macos_dmg.sh
-```
+When a confirmed operation requires elevated access on Windows, KLM starts a
+short-lived helper and relies on the normal UAC prompt. The helper performs one
+validated operation and exits immediately. KLM and its helpers do not accept
+arbitrary destination paths, invoke `sudo`, or open a terminal.
 
-La compilación de Windows debe ejecutarse y validarse en Windows:
+On macOS, library changes are written to the user's Kontakt preferences without
+requiring administrative authorization.
 
-```powershell
-flutter build windows
-```
+## Supported platforms
 
-## Arquitectura
+- macOS: the current project targets macOS 12. A separate Codemagic workflow
+  produces a macOS 10.15-compatible legacy build.
+- Windows: native Windows desktop build with a Registry integration and a
+  short-lived UAC helper for confirmed mutations.
+
+## Scope
+
+KLM currently supports Kontakt's classic library browser. The following are
+outside the current scope:
+
+- Kontakt's newer browser interfaces.
+- NKS tiles and other modern browser metadata.
+- `komplete.db3` management.
+
+Kontakt and any DAW using it should be closed before saving a new classic
+library order.
+
+## Architecture
 
 ```text
 lib/
-  app/                       tema y raíz de la aplicación
-  core/models/               modelo común de librerías y diagnósticos
-  core/metadata/             extracción segura de ProductHints
-  core/validation/           rutas, duplicados y registros incompletos
-  features/libraries/        controlador e interfaz principal
-  platform/                  contrato común y ensamblador de inventario
-  platform/macos/            XML, PLIST y JSON de macOS
-  platform/windows/          XML, JSON y Registro de Windows
+  app/                       Application root and theme wiring
+  core/models/               Shared library and mutation models
+  core/metadata/             Safe ProductHints extraction
+  core/validation/           Path, registry, duplicate, and metadata checks
+  features/libraries/        Inventory controller and main interface
+  features/mutations/        Library candidate scanning and mutation flows
+  platform/                  Shared platform contracts and inventory assembly
+  platform/macos/            macOS XML, PLIST, and JSON integration
+  platform/windows/          Windows XML, JSON, and Registry integration
 ```
 
-El navegador moderno, los mosaicos NKS y la base de datos `komplete.db3` quedan
-fuera del alcance. Kontakt y cualquier DAW que lo esté utilizando deben cerrarse
-antes de guardar un nuevo orden clásico.
+## Development
+
+Install Flutter and run the standard checks from the project root:
+
+```bash
+flutter pub get
+flutter analyze
+flutter test
+```
+
+Run the application on macOS:
+
+```bash
+flutter run -d macos
+```
+
+Build a macOS release locally:
+
+```bash
+flutter build macos --release
+tool/package_macos_dmg.sh
+```
+
+Windows builds should be created and validated on a Windows machine:
+
+```powershell
+flutter config --enable-windows-desktop
+flutter pub get
+flutter build windows --release
+```
+
+## Release process
+
+Codemagic contains separate release workflows for macOS and Windows. The
+macOS legacy workflow also verifies the macOS 10.15 compatibility requirements.
+
+Release packaging and update feeds are generated by these scripts:
+
+- `tool/package_macos_dmg.sh`
+- `tool/generate_macos_appcast.sh`
+- `tool/generate_windows_appcast.ps1`
+
+See [`docs/updates.md`](docs/updates.md) for the update and signing process and
+[`docs/build-matrix.md`](docs/build-matrix.md) for the platform build matrix.
+
+macOS releases use Sparkle update feeds and signed release metadata. Updates
+are downloaded and installed only after the user confirms the action.
