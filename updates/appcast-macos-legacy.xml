@@ -4,15 +4,23 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     <channel>
         <title>Kontakt Library Manager</title>
         <item>
-            <title>0.2.3</title>
-            <pubDate>Sat, 15 Aug 2026 20:13:51 +0000</pubDate>
-            <sparkle:version>15</sparkle:version>
-            <sparkle:shortVersionString>0.2.3</sparkle:shortVersionString>
+            <title>0.2.4</title>
+            <pubDate>Sun, 16 Aug 2026 21:31:38 +0000</pubDate>
+            <sparkle:version>16</sparkle:version>
+            <sparkle:shortVersionString>0.2.4</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>10.15</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/cloinse/klm/releases/download/v0.2.3/klm-macos-v0.2.3.dmg" length="21671628" type="application/octet-stream" sparkle:edSignature="AJbJsxaCvPkbE6v8JEuMdlb8pZOrn4RnVxE8Y2dHrEEXBLU/wO7X1Rrit2OrdBsFPvCFxHMNmiw1rCDHbcQ9AA=="></enclosure>
+<description sparkle:format="plain-text"><![CDATA[
+- Added Simplified Chinese interface support.
+- Added Chinese to the language selector and language preference storage.
+- Added a “What’s New” section to the update dialog.
+- Release notes are now displayed before installing an available update.
+- Added release notes support for macOS and Windows update feeds.
+- Improved the update publishing workflow to embed release notes in appcasts.
+]]></description>
+            <enclosure url="https://github.com/cloinse/klm/releases/download/v0.2.4/klm-macos-v0.2.4.dmg" length="21682963" type="application/octet-stream" sparkle:edSignature="fbABKb14aS4H+f8LEuJtBRgsDiLRZHByZ8phqv39nUlEuhkdndRyOUySHFznOKd8INe1xAD9qZsW1OhO+dhWAw=="></enclosure>
         </item>
     </channel>
 </rss><!-- sparkle-signatures:
-edSignature: Mhx52cv+Yo1Vij6j+sWqQG9MHxddv4+aqg3O65hWlgGD+JCAllz3UB9MozOTeAJHcmFGvdLzGHzh5rRSXRA1DQ==
-length: 1055
+edSignature: xrFqlkEWivRv8cGccJ6MHy81fhoHhxtG/cyVPesb3nW1wvP03DpnVQhEGnaQEpSjYF1XrrEMr2zLhoKtXSnrAg==
+length: 1520
 -->
