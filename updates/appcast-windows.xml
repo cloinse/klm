@@ -3,12 +3,18 @@
   <channel>
     <title>Kontakt Library Manager - Windows</title>
     <item>
-      <title>0.2.3</title>
-      <pubDate>Sat, 15 Aug 2026 20:11:34 GMT</pubDate>
-      <sparkle:version>15</sparkle:version>
-      <sparkle:shortVersionString>0.2.3</sparkle:shortVersionString>
+      <title>0.2.4</title>
+      <pubDate>Sun, 16 Aug 2026 21:22:31 GMT</pubDate>
+      <sparkle:version>16</sparkle:version>
+      <sparkle:shortVersionString>0.2.4</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>10.0</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/cloinse/klm/releases/download/v0.2.3/klm-windows-v0.2.3.exe" length="14769635" type="application/octet-stream" sparkle:os="windows-x64" sparkle:installerArguments="/SILENT /SP- /NOICONS /NORESTART" sparkle:edSignature="aBpoUfqvKBcgpRwQ0MeliZCXbP9L7clckHn+ekL7XbBiL3rn32JOHXLYJivrcuYRu+ClZH96J6G/LnYPn83RDw==" />
+      <description sparkle:format="plain-text"><![CDATA[- Added Simplified Chinese interface support.
+- Added Chinese to the language selector and language preference storage.
+- Added a “What’s New” section to the update dialog.
+- Release notes are now displayed before installing an available update.
+- Added release notes support for macOS and Windows update feeds.
+- Improved the update publishing workflow to embed release notes in appcasts.]]></description>
+      <enclosure url="https://github.com/cloinse/klm/releases/download/v0.2.4/klm-windows-v0.2.4.exe" length="14775815" type="application/octet-stream" sparkle:os="windows-x64" sparkle:installerArguments="/SILENT /SP- /NOICONS /NORESTART" sparkle:edSignature="w902qz5zOLvaVM3TpKDFP1lNVmg4fCN/vbKD3WBwrNuhK+6bMKKUDlTa8298LYApt9EsqYubQ+JSYDfBdcecBg==" />
     </item>
   </channel>
 </rss>
