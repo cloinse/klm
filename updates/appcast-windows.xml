@@ -3,18 +3,17 @@
   <channel>
     <title>Kontakt Library Manager - Windows</title>
     <item>
-      <title>0.2.4</title>
-      <pubDate>Sun, 16 Aug 2026 21:22:31 GMT</pubDate>
-      <sparkle:version>16</sparkle:version>
-      <sparkle:shortVersionString>0.2.4</sparkle:shortVersionString>
+      <title>0.2.5</title>
+      <pubDate>Sun, 16 Aug 2026 22:13:02 GMT</pubDate>
+      <sparkle:version>17</sparkle:version>
+      <sparkle:shortVersionString>0.2.5</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>10.0</sparkle:minimumSystemVersion>
-      <description sparkle:format="plain-text"><![CDATA[- Added Simplified Chinese interface support.
-- Added Chinese to the language selector and language preference storage.
-- Added a “What’s New” section to the update dialog.
-- Release notes are now displayed before installing an available update.
-- Added release notes support for macOS and Windows update feeds.
-- Improved the update publishing workflow to embed release notes in appcasts.]]></description>
-      <enclosure url="https://github.com/cloinse/klm/releases/download/v0.2.4/klm-windows-v0.2.4.exe" length="14775815" type="application/octet-stream" sparkle:os="windows-x64" sparkle:installerArguments="/SILENT /SP- /NOICONS /NORESTART" sparkle:edSignature="w902qz5zOLvaVM3TpKDFP1lNVmg4fCN/vbKD3WBwrNuhK+6bMKKUDlTa8298LYApt9EsqYubQ+JSYDfBdcecBg==" />
+      <description sparkle:format="plain-text"><![CDATA[- Added clickable status cards to filter libraries by Healthy, Needs Attention, Offline, or Total.
+- Added multi-selection and batch removal for library records, with confirmation and classic-order preservation.
+- Added direct library actions to Diagnostics, including showing the folder, repairing, relocating, and removing records.
+- Improved batch-removal recovery so the inventory stays synchronized after partial platform failures.
+- Preserved native language names in the language selector, including English, Español, Português (Brasil), and 简体中文.]]></description>
+      <enclosure url="https://github.com/cloinse/klm/releases/download/v0.2.5/klm-windows-v0.2.5.exe" length="14779774" type="application/octet-stream" sparkle:os="windows-x64" sparkle:installerArguments="/SILENT /SP- /NOICONS /NORESTART" sparkle:edSignature="nXOtDLTSer1+fksSf/nsA/7zrtZNoFHBw+Tz15GN3l/XkPceJ7+3QExiR+ZrhxBlaA92SanPMVVzOHAzbgTPAQ==" />
     </item>
   </channel>
 </rss>
