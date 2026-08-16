@@ -1,6 +1,5 @@
-- Added Simplified Chinese interface support.
-- Added Chinese to the language selector and language preference storage.
-- Added a “What’s New” section to the update dialog.
-- Release notes are now displayed before installing an available update.
-- Added release notes support for macOS and Windows update feeds.
-- Improved the update publishing workflow to embed release notes in appcasts.
+- Added clickable status cards to filter libraries by Healthy, Needs Attention, Offline, or Total.
+- Added multi-selection and batch removal for library records, with confirmation and classic-order preservation.
+- Added direct library actions to Diagnostics, including showing the folder, repairing, relocating, and removing records.
+- Improved batch-removal recovery so the inventory stays synchronized after partial platform failures.
+- Preserved native language names in the language selector, including English, Español, Português (Brasil), and 简体中文.

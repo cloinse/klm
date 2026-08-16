@@ -55,7 +55,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('English'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Spanish').last);
+    await tester.tap(find.text('Español').last);
     await tester.pumpAndSettle();
 
     expect(find.text('Ajustes'), findsNWidgets(2));
@@ -65,7 +65,9 @@ void main() {
 
     await tester.tap(find.text('Español'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Portugués (Brasil)').last);
+    expect(find.text('English'), findsOneWidget);
+    expect(find.text('Inglés'), findsNothing);
+    await tester.tap(find.text('Português (Brasil)').last);
     await tester.pumpAndSettle();
 
     expect(find.text('Configurações'), findsNWidgets(2));
@@ -424,6 +426,152 @@ void main() {
 
     expect(filteredHeight, unfilteredHeight);
   });
+
+  testWidgets('status cards filter the inventory', (tester) async {
+    tester.view.physicalSize = const Size(1400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final platform = _FakePlatform(
+      libraries: const [
+        KontaktLibrary(
+          id: 'healthy',
+          name: 'Healthy Library',
+          userListIndex: 0,
+        ),
+        KontaktLibrary(
+          id: 'attention',
+          name: 'Attention Library',
+          userListIndex: 1,
+          issues: [
+            LibraryIssue(
+              code: 'duplicate_registration',
+              message: 'Duplicate registration',
+              severity: IssueSeverity.warning,
+            ),
+          ],
+        ),
+        KontaktLibrary(
+          id: 'offline',
+          name: 'Offline Library',
+          userListIndex: 2,
+          issues: [
+            LibraryIssue(
+              code: 'content_offline',
+              message: 'Content is offline',
+              severity: IssueSeverity.error,
+            ),
+          ],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(KontaktLibraryManagerApp(platform: platform));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('stat-card-healthy')));
+    await tester.pumpAndSettle();
+    expect(find.text('Healthy Library'), findsOneWidget);
+    expect(find.text('Attention Library'), findsNothing);
+    expect(find.text('Offline Library'), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('stat-card-attention')));
+    await tester.pumpAndSettle();
+    expect(find.text('Healthy Library'), findsNothing);
+    expect(find.text('Attention Library'), findsOneWidget);
+    expect(find.text('Offline Library'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('stat-card-offline')));
+    await tester.pumpAndSettle();
+    expect(find.text('Attention Library'), findsNothing);
+    expect(find.text('Offline Library'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('stat-card-all')));
+    await tester.pumpAndSettle();
+    expect(find.text('Healthy Library'), findsOneWidget);
+    expect(find.text('Attention Library'), findsOneWidget);
+    expect(find.text('Offline Library'), findsOneWidget);
+  });
+
+  testWidgets('removes multiple selected libraries from the inventory', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final platform = _FakePlatform(
+      libraries: [
+        const KontaktLibrary(id: 'alpha', name: 'Alpha', userListIndex: 0),
+        const KontaktLibrary(id: 'beta', name: 'Beta', userListIndex: 1),
+      ],
+    );
+
+    await tester.pumpWidget(KontaktLibraryManagerApp(platform: platform));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('select-library-alpha')));
+    await tester.tap(find.byKey(const ValueKey('select-library-beta')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Remove selected (2)'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('remove-selected-libraries')));
+    await tester.pumpAndSettle();
+    expect(find.text('Remove 2 library records?'), findsOneWidget);
+
+    await tester.tap(find.text('Confirm'));
+    await tester.pumpAndSettle();
+
+    expect(platform.removedLibraryIds, ['alpha', 'beta']);
+    expect(find.text('Alpha'), findsNothing);
+    expect(find.text('Beta'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('remove-selected-libraries')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('diagnostics exposes direct library actions', (tester) async {
+    tester.view.physicalSize = const Size(1400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final platform = _FakePlatform(
+      libraries: const [
+        KontaktLibrary(
+          id: 'offline',
+          name: 'Offline Library',
+          contentPath: '/Library/Offline',
+          issues: [
+            LibraryIssue(
+              code: 'content_offline',
+              message: 'Content is offline',
+              severity: IssueSeverity.error,
+            ),
+          ],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(KontaktLibraryManagerApp(platform: platform));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Diagnostics').first);
+    await tester.pumpAndSettle();
+
+    final actions = find.byIcon(Icons.more_horiz_rounded);
+    expect(actions, findsOneWidget);
+    await tester.tap(actions);
+    await tester.pumpAndSettle();
+    expect(find.text('Remove records'), findsOneWidget);
+    await tester.tap(find.text('Remove records'));
+    await tester.pumpAndSettle();
+    expect(find.text('Remove library records?'), findsOneWidget);
+
+    await tester.tap(find.text('Confirm'));
+    await tester.pumpAndSettle();
+
+    expect(platform.removedLibraryIds, ['offline']);
+    expect(find.text('Everything looks good'), findsOneWidget);
+  });
 }
 
 class _FakeAppUpdatePlatform implements AppUpdatePlatform {
@@ -467,8 +615,9 @@ class _FakePlatform implements KontaktPlatform {
     ],
   });
 
-  final List<KontaktLibrary> libraries;
+  List<KontaktLibrary> libraries;
   List<KontaktLibrary>? savedOrder;
+  final List<String> removedLibraryIds = <String>[];
 
   @override
   PlatformCapabilities get capabilities => const PlatformCapabilities(
@@ -510,8 +659,17 @@ class _FakePlatform implements KontaktPlatform {
   ) => throw UnimplementedError();
 
   @override
-  Future<KontaktMutationResult> removeLibrary(KontaktLibrary library) =>
-      throw UnimplementedError();
+  Future<KontaktMutationResult> removeLibrary(KontaktLibrary library) async {
+    removedLibraryIds.add(library.id);
+    libraries = libraries
+        .where((candidate) => candidate.id != library.id)
+        .toList(growable: false);
+    return KontaktMutationResult(
+      operation: KontaktMutationType.remove,
+      libraryName: library.name,
+      changedPaths: const [],
+    );
+  }
 
   @override
   Future<KontaktMutationResult> upsertLibrary(

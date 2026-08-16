@@ -142,11 +142,67 @@ void main() {
       'Gamma',
       'Delta',
     ]);
-    expect(
-      platform.libraries.map((library) => library.userListIndex),
-      [1, 2, 3],
-    );
+    expect(platform.libraries.map((library) => library.userListIndex), [
+      1,
+      2,
+      3,
+    ]);
     expect(controller.hasUnsavedCustomOrder, isFalse);
+  });
+
+  test(
+    'selects and removes multiple libraries while preserving order',
+    () async {
+      final platform = _OrderPlatform()
+        ..libraries = const [
+          KontaktLibrary(id: 'alpha', name: 'Alpha', userListIndex: 1),
+          KontaktLibrary(id: 'beta', name: 'Beta', userListIndex: 2),
+          KontaktLibrary(id: 'gamma', name: 'Gamma', userListIndex: 3),
+          KontaktLibrary(id: 'delta', name: 'Delta', userListIndex: 4),
+        ];
+      final controller = LibraryInventoryController(platform);
+      addTearDown(controller.dispose);
+
+      await controller.refresh();
+      final selected = controller.snapshot!.libraries
+          .where((library) => library.id == 'beta' || library.id == 'gamma')
+          .toList();
+      for (final library in selected) {
+        controller.setLibrarySelected(library.id, true);
+      }
+
+      expect(controller.selectedLibraryCount, 2);
+      expect(controller.selectedLibraries.map((library) => library.id), [
+        'beta',
+        'gamma',
+      ]);
+
+      await controller.removeLibraries(selected);
+
+      expect(platform.removedLibraryIds, ['beta', 'gamma']);
+      expect(platform.savedOrder?.map((library) => library.name), [
+        'Alpha',
+        'Delta',
+      ]);
+      expect(controller.selectedLibraryCount, 0);
+      expect(controller.visibleLibraries.map((library) => library.name), [
+        'Alpha',
+        'Delta',
+      ]);
+    },
+  );
+
+  test('changing a filter clears hidden library selections', () async {
+    final controller = LibraryInventoryController(_OrderPlatform());
+    addTearDown(controller.dispose);
+    await controller.refresh();
+
+    controller.setLibrarySelected('alpha', true);
+    expect(controller.selectedLibraryCount, 1);
+
+    controller.setFilter(LibraryFilter.healthy);
+
+    expect(controller.selectedLibraryCount, 0);
   });
 }
 
@@ -158,6 +214,7 @@ class _OrderPlatform implements KontaktPlatform {
   ];
   List<KontaktLibrary>? savedOrder;
   String? removedLibraryId;
+  final List<String> removedLibraryIds = <String>[];
 
   @override
   PlatformCapabilities get capabilities => const PlatformCapabilities(
@@ -212,6 +269,7 @@ class _OrderPlatform implements KontaktPlatform {
   @override
   Future<KontaktMutationResult> removeLibrary(KontaktLibrary library) async {
     removedLibraryId = library.id;
+    removedLibraryIds.add(library.id);
     libraries = libraries
         .where((candidate) => candidate.id != library.id)
         .toList(growable: false);

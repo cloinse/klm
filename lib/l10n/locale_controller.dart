@@ -26,6 +26,13 @@ enum AppLanguage {
     AppLanguage.portugueseBrazil => 'pt_BR',
     AppLanguage.chineseSimplified => 'zh',
   };
+
+  String get nativeName => switch (this) {
+    AppLanguage.english => 'English',
+    AppLanguage.spanish => 'Español',
+    AppLanguage.portugueseBrazil => 'Português (Brasil)',
+    AppLanguage.chineseSimplified => '简体中文',
+  };
 }
 
 class LocaleController extends ChangeNotifier {

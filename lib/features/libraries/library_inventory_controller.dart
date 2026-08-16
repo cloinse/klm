@@ -47,6 +47,7 @@ class LibraryInventoryController extends ChangeNotifier {
   bool _customOrderInitialized = false;
   final List<String> _customLibraryIds = <String>[];
   List<String> _savedCustomLibraryIds = const <String>[];
+  final Set<String> _selectedLibraryIds = <String>{};
   final List<OperationLog> logs = <OperationLog>[];
 
   Future<void> refresh() async {
@@ -60,6 +61,10 @@ class LibraryInventoryController extends ChangeNotifier {
     try {
       final inventory = await platform.scanLibraries();
       snapshot = inventory;
+      final availableIds = inventory.libraries
+          .map((library) => library.id)
+          .toSet();
+      _selectedLibraryIds.removeWhere((id) => !availableIds.contains(id));
       _synchronizeCustomOrder(inventory.libraries);
       await refreshHelperStatus(notify: false);
       state = InventoryLoadState.ready;
@@ -78,17 +83,64 @@ class LibraryInventoryController extends ChangeNotifier {
   }
 
   void setQuery(String value) {
+    if (query == value) return;
     query = value;
+    _selectedLibraryIds.clear();
     notifyListeners();
   }
 
   void setFilter(LibraryFilter value) {
+    if (filter == value) return;
     filter = value;
+    _selectedLibraryIds.clear();
     notifyListeners();
   }
 
   void setSort(LibrarySort value) {
     sort = value;
+    notifyListeners();
+  }
+
+  Set<String> get selectedLibraryIds =>
+      Set<String>.unmodifiable(_selectedLibraryIds);
+
+  int get selectedLibraryCount => _selectedLibraryIds.length;
+
+  bool isLibrarySelected(String libraryId) =>
+      _selectedLibraryIds.contains(libraryId);
+
+  List<KontaktLibrary> get selectedLibraries => [
+    for (final library in snapshot?.libraries ?? const <KontaktLibrary>[])
+      if (_selectedLibraryIds.contains(library.id)) library,
+  ];
+
+  bool get allVisibleLibrariesSelected =>
+      visibleLibraries.isNotEmpty &&
+      visibleLibraries.every((library) => isLibrarySelected(library.id));
+
+  bool get someVisibleLibrariesSelected =>
+      visibleLibraries.any((library) => isLibrarySelected(library.id));
+
+  void setLibrarySelected(String libraryId, bool selected) {
+    final changed = selected
+        ? _selectedLibraryIds.add(libraryId)
+        : _selectedLibraryIds.remove(libraryId);
+    if (changed) notifyListeners();
+  }
+
+  void setVisibleLibrariesSelected(bool selected) {
+    final visibleIds = visibleLibraries.map((library) => library.id);
+    if (selected) {
+      _selectedLibraryIds.addAll(visibleIds);
+    } else {
+      _selectedLibraryIds.removeAll(visibleIds);
+    }
+    notifyListeners();
+  }
+
+  void clearSelection() {
+    if (_selectedLibraryIds.isEmpty) return;
+    _selectedLibraryIds.clear();
     notifyListeners();
   }
 
@@ -284,16 +336,42 @@ class LibraryInventoryController extends ChangeNotifier {
   }
 
   Future<void> removeLibrary(KontaktLibrary library) async {
-    final shouldPersistOrder = _customLibraryIds.contains(library.id);
-    await _runMutation(() async {
-      await _ensureHelperEnabled();
-      await platform.removeLibrary(library);
-      _log('library_removed', library.name);
-    });
+    await removeLibraries([library]);
+  }
+
+  Future<void> removeLibraries(Iterable<KontaktLibrary> values) async {
+    if (mutationInProgress) return;
+    final libraries = <KontaktLibrary>[];
+    final seenIds = <String>{};
+    for (final library in values) {
+      if (seenIds.add(library.id)) libraries.add(library);
+    }
+    if (libraries.isEmpty) return;
+
+    final removedIds = libraries.map((library) => library.id).toSet();
+    final shouldPersistOrder = removedIds.any(
+      (libraryId) => _customLibraryIds.contains(libraryId),
+    );
+    try {
+      await _runMutation(() async {
+        await _ensureHelperEnabled();
+        for (final library in libraries) {
+          await platform.removeLibrary(library);
+          _log('library_removed', library.name);
+        }
+      });
+    } catch (error) {
+      // A platform can fail after removing an earlier item in the batch.
+      // Refresh before surfacing the error so the UI never shows stale rows.
+      await refresh();
+      rethrow;
+    }
+    _selectedLibraryIds.removeAll(removedIds);
+    notifyListeners();
     if (shouldPersistOrder && platform.capabilities.canManageClassicOrder) {
       _savedCustomLibraryIds = List<String>.unmodifiable([
-        ..._savedCustomLibraryIds.where((id) => id != library.id),
-        library.id,
+        ..._savedCustomLibraryIds.where((id) => !removedIds.contains(id)),
+        ...removedIds,
       ]);
       await saveCustomOrder();
     }

@@ -116,6 +116,7 @@ class AppLocalizations {
       'confirmRepairTitle': 'Confirm repair',
       'confirmRelocateTitle': 'Confirm relocation',
       'confirmRemoveTitle': 'Remove library records?',
+      'confirmRemoveMultipleTitle': 'Remove {count} library records?',
       'confirmAddMessage':
           'The following libraries will be registered for Kontakt:',
       'confirmRepairMessage':
@@ -131,6 +132,9 @@ class AppLocalizations {
       'alreadyRegistered':
           'This library is already registered. Use Repair instead.',
       'operationComplete': 'Operation completed successfully.',
+      'removeSelected': 'Remove selected ({count})',
+      'selectVisible': 'Select visible',
+      'clearSelection': 'Clear selection',
       'helperApprovalTitle': 'Administrator approval required',
       'helperApprovalMessage':
           'The one-time administrator component is unavailable. Reinstall the application and retry the operation.',
@@ -297,6 +301,8 @@ class AppLocalizations {
       'confirmRepairTitle': 'Confirmar reparación',
       'confirmRelocateTitle': 'Confirmar reubicación',
       'confirmRemoveTitle': '¿Eliminar los registros de la librería?',
+      'confirmRemoveMultipleTitle':
+          '¿Eliminar {count} registros de la librería?',
       'confirmAddMessage':
           'Las siguientes librerías se registrarán para Kontakt:',
       'confirmRepairMessage':
@@ -311,6 +317,9 @@ class AppLocalizations {
       'alreadyRegistered':
           'Esta librería ya está registrada. Utiliza Reparar en su lugar.',
       'operationComplete': 'Operación completada correctamente.',
+      'removeSelected': 'Eliminar seleccionadas ({count})',
+      'selectVisible': 'Seleccionar visibles',
+      'clearSelection': 'Limpiar selección',
       'helperApprovalTitle': 'Se requiere aprobación administrativa',
       'helperApprovalMessage':
           'El componente de autorización administrativa puntual no está disponible. Reinstala la aplicación y vuelve a intentar la operación.',
@@ -484,6 +493,7 @@ class AppLocalizations {
       'confirmRepairTitle': 'Confirmar reparo',
       'confirmRelocateTitle': 'Confirmar realocação',
       'confirmRemoveTitle': 'Remover os registros da biblioteca?',
+      'confirmRemoveMultipleTitle': 'Remover {count} registros da biblioteca?',
       'confirmAddMessage':
           'As seguintes bibliotecas serão registradas para o Kontakt:',
       'confirmRepairMessage':
@@ -497,6 +507,9 @@ class AppLocalizations {
       'candidateMismatch': 'A pasta selecionada pertence a outra biblioteca.',
       'alreadyRegistered': 'Esta biblioteca já está registrada. Use Reparar.',
       'operationComplete': 'Operação concluída com sucesso.',
+      'removeSelected': 'Remover selecionadas ({count})',
+      'selectVisible': 'Selecionar visíveis',
+      'clearSelection': 'Limpar seleção',
       'helperApprovalTitle': 'Aprovação de administrador necessária',
       'helperApprovalMessage':
           'O componente de autorização administrativa pontual não está disponível. Reinstale o aplicativo e tente novamente.',
@@ -671,6 +684,7 @@ class AppLocalizations {
       'confirmRepairTitle': '确认修复',
       'confirmRelocateTitle': '确认移动',
       'confirmRemoveTitle': '删除音色库记录？',
+      'confirmRemoveMultipleTitle': '删除 {count} 条音色库记录？',
       'confirmAddMessage': '以下音色库将注册到 Kontakt：',
       'confirmRepairMessage': '将重建 XML、偏好设置和 installed_products 记录。',
       'confirmRelocateMessage': '注册的内容路径将更改为：',
@@ -680,6 +694,9 @@ class AppLocalizations {
       'candidateMismatch': '所选文件夹属于其他音色库。',
       'alreadyRegistered': '该音色库已注册。请改用修复。',
       'operationComplete': '操作已成功完成。',
+      'removeSelected': '删除所选项（{count}）',
+      'selectVisible': '选择当前列表',
+      'clearSelection': '清除选择',
       'helperApprovalTitle': '需要管理员授权',
       'helperApprovalMessage': '一次性管理员组件不可用。请重新安装应用程序并重试该操作。',
       'helperUnsupportedMessage': '此系统不支持一次性管理员操作。',

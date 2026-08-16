@@ -220,11 +220,13 @@ class _LibraryDashboardState extends State<LibraryDashboard> {
   Widget _buildSection() => switch (_section) {
     DashboardSection.library => _InventoryView(
       controller: widget.controller,
+      actions: _LibraryActionController(widget.controller),
       onShowDiagnostics: () =>
           setState(() => _section = DashboardSection.diagnostics),
     ),
     DashboardSection.diagnostics => _DiagnosticsView(
       controller: widget.controller,
+      actions: _LibraryActionController(widget.controller),
     ),
     DashboardSection.activity => _ActivityView(controller: widget.controller),
     DashboardSection.settings => _SettingsView(
@@ -555,13 +557,387 @@ class _NavigationItem extends StatelessWidget {
   }
 }
 
+class _LibraryActionController {
+  const _LibraryActionController(this.controller);
+
+  final LibraryInventoryController controller;
+
+  Future<void> revealLibrary(
+    BuildContext context,
+    KontaktLibrary library,
+  ) async {
+    try {
+      await controller.reveal(library);
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
+    }
+  }
+
+  Future<void> saveCustomOrder(BuildContext context) async {
+    try {
+      await controller.saveCustomOrder();
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.tr('classicOrderSaved'))),
+      );
+    } on PlatformException catch (error) {
+      if (!context.mounted) return;
+      await _showMessage(
+        context,
+        error.code == 'kontakt_running'
+            ? context.l10n.tr('closeKontaktBeforeOrderSave')
+            : error.message ?? context.l10n.tr('classicOrderSaveFailed'),
+        title: context.l10n.tr('classicOrderSaveFailed'),
+      );
+    } catch (error) {
+      if (!context.mounted) return;
+      await _showMessage(
+        context,
+        error.toString(),
+        title: context.l10n.tr('classicOrderSaveFailed'),
+      );
+    }
+  }
+
+  Future<void> addLibraries(
+    BuildContext context, {
+    required bool allowMultiple,
+  }) async {
+    try {
+      final candidates = await controller.chooseLibraryCandidates(
+        allowMultiple: allowMultiple,
+      );
+      if (candidates.isEmpty || !context.mounted) return;
+      final confirmed = await _confirmCandidates(
+        context,
+        candidates,
+        repair: false,
+      );
+      if (!confirmed || !context.mounted) return;
+      await runMutation(
+        context,
+        () => controller.upsertCandidates(candidates, repair: false),
+      );
+    } catch (error) {
+      if (context.mounted) await _showMutationError(context, error);
+    }
+  }
+
+  Future<void> repairLibrary(
+    BuildContext context,
+    KontaktLibrary library,
+  ) async {
+    try {
+      final candidates = await controller.chooseLibraryCandidates(
+        allowMultiple: false,
+      );
+      if (candidates.isEmpty || !context.mounted) return;
+      final candidate = candidates.first;
+      if (!controller.candidateMatchesLibrary(candidate, library)) {
+        await _showMessage(context, context.l10n.tr('candidateMismatch'));
+        return;
+      }
+      final confirmed = await _confirmCandidates(context, [
+        candidate,
+      ], repair: true);
+      if (!confirmed || !context.mounted) return;
+      await runMutation(
+        context,
+        () => controller.upsertCandidates([candidate], repair: true),
+      );
+    } catch (error) {
+      if (context.mounted) await _showMutationError(context, error);
+    }
+  }
+
+  Future<void> relocateLibrary(
+    BuildContext context,
+    KontaktLibrary library,
+  ) async {
+    try {
+      final path = await controller.chooseContentDirectory();
+      if (path == null || !context.mounted) return;
+      final confirmed =
+          await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              icon: const Icon(Icons.drive_file_move_outline),
+              title: Text(context.l10n.tr('confirmRelocateTitle')),
+              content: SizedBox(
+                width: 480,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(context.l10n.tr('confirmRelocateMessage')),
+                    const SizedBox(height: 12),
+                    SelectableText(
+                      path,
+                      style: const TextStyle(color: Color(0xFFF2B544)),
+                    ),
+                  ],
+                ),
+              ),
+              actions: _confirmationActions(context),
+            ),
+          ) ??
+          false;
+      if (!confirmed || !context.mounted) return;
+      await runMutation(
+        context,
+        () => controller.relocateLibrary(library, path),
+      );
+    } catch (error) {
+      if (context.mounted) await _showMutationError(context, error);
+    }
+  }
+
+  Future<void> removeLibrary(
+    BuildContext context,
+    KontaktLibrary library,
+  ) async {
+    final confirmed =
+        await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            icon: const Icon(
+              Icons.delete_outline_rounded,
+              color: Color(0xFFFF806E),
+            ),
+            title: Text(context.l10n.tr('confirmRemoveTitle')),
+            content: SizedBox(
+              width: 480,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    library.name,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(context.l10n.tr('confirmRemoveMessage')),
+                  const SizedBox(height: 10),
+                  Text(
+                    context.l10n.tr('contentWillRemain'),
+                    style: const TextStyle(color: Color(0xFF61D39A)),
+                  ),
+                ],
+              ),
+            ),
+            actions: _confirmationActions(context, destructive: true),
+          ),
+        ) ??
+        false;
+    if (!confirmed || !context.mounted) return;
+    await runMutation(context, () => controller.removeLibrary(library));
+  }
+
+  Future<void> removeLibraries(
+    BuildContext context,
+    List<KontaktLibrary> libraries,
+  ) async {
+    if (libraries.isEmpty) return;
+    final confirmed =
+        await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            icon: const Icon(
+              Icons.delete_outline_rounded,
+              color: Color(0xFFFF806E),
+            ),
+            title: Text(
+              context.l10n.format('confirmRemoveMultipleTitle', {
+                'count': libraries.length,
+              }),
+            ),
+            content: SizedBox(
+              width: 480,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(context.l10n.tr('confirmRemoveMessage')),
+                  const SizedBox(height: 12),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 220),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: libraries.length,
+                      itemBuilder: (context, index) => ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.album_outlined, size: 20),
+                        title: Text(libraries[index].name),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    context.l10n.tr('contentWillRemain'),
+                    style: const TextStyle(color: Color(0xFF61D39A)),
+                  ),
+                ],
+              ),
+            ),
+            actions: _confirmationActions(context, destructive: true),
+          ),
+        ) ??
+        false;
+    if (!confirmed || !context.mounted) return;
+    await runMutation(context, () => controller.removeLibraries(libraries));
+  }
+
+  Future<bool> _confirmCandidates(
+    BuildContext context,
+    List<KontaktLibraryCandidate> candidates, {
+    required bool repair,
+  }) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            icon: Icon(
+              repair ? Icons.build_outlined : Icons.library_add_outlined,
+            ),
+            title: Text(
+              context.l10n.tr(
+                repair ? 'confirmRepairTitle' : 'confirmAddTitle',
+              ),
+            ),
+            content: SizedBox(
+              width: 500,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    context.l10n.tr(
+                      repair ? 'confirmRepairMessage' : 'confirmAddMessage',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 260),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: candidates.length,
+                      itemBuilder: (context, index) => ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.album_outlined, size: 20),
+                        title: Text(candidates[index].metadata.name),
+                        subtitle: Text(
+                          candidates[index].contentPath,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: _confirmationActions(context),
+          ),
+        ) ??
+        false;
+  }
+
+  List<Widget> _confirmationActions(
+    BuildContext context, {
+    bool destructive = false,
+  }) {
+    return [
+      TextButton(
+        onPressed: () => Navigator.pop(context, false),
+        child: Text(context.l10n.tr('cancel')),
+      ),
+      FilledButton(
+        style: destructive
+            ? FilledButton.styleFrom(backgroundColor: const Color(0xFFB84E43))
+            : null,
+        onPressed: () => Navigator.pop(context, true),
+        child: Text(context.l10n.tr('confirm')),
+      ),
+    ];
+  }
+
+  Future<void> runMutation(
+    BuildContext context,
+    Future<void> Function() operation,
+  ) async {
+    try {
+      await operation();
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.tr('operationComplete'))),
+      );
+    } catch (error) {
+      if (context.mounted) await _showMutationError(context, error);
+    }
+  }
+
+  Future<void> _showMutationError(BuildContext context, Object error) {
+    if (error is LibraryAlreadyRegistered) {
+      return _showMessage(
+        context,
+        '${context.l10n.tr('alreadyRegistered')}\n\n${error.libraryName}',
+      );
+    }
+    if (error is PrivilegedHelperRequired) {
+      final unsupported = error.status == PrivilegedHelperStatus.unsupported;
+      return _showMessage(
+        context,
+        context.l10n.tr(
+          unsupported ? 'helperUnsupportedMessage' : 'helperApprovalMessage',
+        ),
+        title: context.l10n.tr('helperApprovalTitle'),
+      );
+    }
+    if (error is PlatformException) {
+      return _showMessage(
+        context,
+        error.message ?? context.l10n.tr('operation_mutation_error_title'),
+        title: context.l10n.tr('operation_mutation_error_title'),
+      );
+    }
+    return _showMessage(context, error.toString());
+  }
+
+  Future<void> _showMessage(
+    BuildContext context,
+    String message, {
+    String? title,
+  }) {
+    return showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.admin_panel_settings_outlined),
+        title: title == null ? null : Text(title),
+        content: SizedBox(width: 440, child: Text(message)),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(context.l10n.tr('close')),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _InventoryView extends StatelessWidget {
   const _InventoryView({
     required this.controller,
+    required this.actions,
     required this.onShowDiagnostics,
   });
 
   final LibraryInventoryController controller;
+  final _LibraryActionController actions;
   final VoidCallback onShowDiagnostics;
 
   @override
@@ -574,6 +950,28 @@ class _InventoryView extends StatelessWidget {
           _PageHeader(
             title: context.l10n.tr('inventoryTitle'),
             actions: [
+              if (controller.selectedLibraryCount > 0) ...[
+                FilledButton.icon(
+                  key: const ValueKey('remove-selected-libraries'),
+                  onPressed: controller.mutationInProgress
+                      ? null
+                      : () => actions.removeLibraries(
+                          context,
+                          controller.selectedLibraries,
+                        ),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFB84E43),
+                    foregroundColor: Colors.white,
+                  ),
+                  icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                  label: Text(
+                    context.l10n.format('removeSelected', {
+                      'count': controller.selectedLibraryCount,
+                    }),
+                  ),
+                ),
+                const SizedBox(width: 10),
+              ],
               if (controller.hasUnsavedCustomOrder) ...[
                 Tooltip(
                   message: context.l10n.tr('closeKontaktBeforeOrderSave'),
@@ -582,7 +980,7 @@ class _InventoryView extends StatelessWidget {
                         controller.orderSaveInProgress ||
                             controller.mutationInProgress
                         ? null
-                        : () => _saveCustomOrder(context),
+                        : () => actions.saveCustomOrder(context),
                     icon: controller.orderSaveInProgress
                         ? const SizedBox.square(
                             dimension: 15,
@@ -611,7 +1009,7 @@ class _InventoryView extends StatelessWidget {
                 key: const ValueKey('add-library-button'),
                 onPressed: controller.mutationInProgress
                     ? null
-                    : () => _addLibraries(context, allowMultiple: false),
+                    : () => actions.addLibraries(context, allowMultiple: false),
                 style: FilledButton.styleFrom(
                   backgroundColor: context.klmColors.accentButtonBackground,
                   foregroundColor: context.klmColors.accentButtonForeground,
@@ -627,7 +1025,8 @@ class _InventoryView extends StatelessWidget {
                 enabled: !controller.mutationInProgress,
                 tooltip: context.l10n.tr('addMultipleLibraries'),
                 icon: const Icon(Icons.arrow_drop_down_rounded),
-                onSelected: (_) => _addLibraries(context, allowMultiple: true),
+                onSelected: (_) =>
+                    actions.addLibraries(context, allowMultiple: true),
                 itemBuilder: (_) => [
                   PopupMenuItem(
                     value: 'multiple',
@@ -750,317 +1149,15 @@ class _InventoryView extends StatelessWidget {
       key: ValueKey('library-card-${library.id}'),
       library: library,
       dragHandle: dragHandle,
-      onReveal: () async {
-        try {
-          await controller.reveal(library);
-        } catch (error) {
-          if (!context.mounted) return;
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(error.toString())));
-        }
-      },
+      onReveal: () => actions.revealLibrary(context, library),
       onDiagnose: onShowDiagnostics,
-      onRepair: () => _repairLibrary(context, library),
-      onRelocate: () => _relocateLibrary(context, library),
-      onRemove: () => _removeLibrary(context, library),
-    );
-  }
-
-  Future<void> _saveCustomOrder(BuildContext context) async {
-    try {
-      await controller.saveCustomOrder();
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.l10n.tr('classicOrderSaved'))),
-      );
-    } on PlatformException catch (error) {
-      if (!context.mounted) return;
-      await _showMessage(
-        context,
-        error.code == 'kontakt_running'
-            ? context.l10n.tr('closeKontaktBeforeOrderSave')
-            : error.message ?? context.l10n.tr('classicOrderSaveFailed'),
-        title: context.l10n.tr('classicOrderSaveFailed'),
-      );
-    } catch (error) {
-      if (!context.mounted) return;
-      await _showMessage(
-        context,
-        error.toString(),
-        title: context.l10n.tr('classicOrderSaveFailed'),
-      );
-    }
-  }
-
-  Future<void> _addLibraries(
-    BuildContext context, {
-    required bool allowMultiple,
-  }) async {
-    try {
-      final candidates = await controller.chooseLibraryCandidates(
-        allowMultiple: allowMultiple,
-      );
-      if (candidates.isEmpty || !context.mounted) return;
-      final confirmed = await _confirmCandidates(
-        context,
-        candidates,
-        repair: false,
-      );
-      if (!confirmed || !context.mounted) return;
-      await _runMutation(
-        context,
-        () => controller.upsertCandidates(candidates, repair: false),
-      );
-    } catch (error) {
-      if (context.mounted) await _showMutationError(context, error);
-    }
-  }
-
-  Future<void> _repairLibrary(
-    BuildContext context,
-    KontaktLibrary library,
-  ) async {
-    try {
-      final candidates = await controller.chooseLibraryCandidates(
-        allowMultiple: false,
-      );
-      if (candidates.isEmpty || !context.mounted) return;
-      final candidate = candidates.first;
-      if (!controller.candidateMatchesLibrary(candidate, library)) {
-        await _showMessage(context, context.l10n.tr('candidateMismatch'));
-        return;
-      }
-      final confirmed = await _confirmCandidates(context, [
-        candidate,
-      ], repair: true);
-      if (!confirmed || !context.mounted) return;
-      await _runMutation(
-        context,
-        () => controller.upsertCandidates([candidate], repair: true),
-      );
-    } catch (error) {
-      if (context.mounted) await _showMutationError(context, error);
-    }
-  }
-
-  Future<void> _relocateLibrary(
-    BuildContext context,
-    KontaktLibrary library,
-  ) async {
-    try {
-      final path = await controller.chooseContentDirectory();
-      if (path == null || !context.mounted) return;
-      final confirmed =
-          await showDialog<bool>(
-            context: context,
-            builder: (context) => AlertDialog(
-              icon: const Icon(Icons.drive_file_move_outline),
-              title: Text(context.l10n.tr('confirmRelocateTitle')),
-              content: SizedBox(
-                width: 480,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(context.l10n.tr('confirmRelocateMessage')),
-                    const SizedBox(height: 12),
-                    SelectableText(
-                      path,
-                      style: const TextStyle(color: Color(0xFFF2B544)),
-                    ),
-                  ],
-                ),
-              ),
-              actions: _confirmationActions(context),
-            ),
-          ) ??
-          false;
-      if (!confirmed || !context.mounted) return;
-      await _runMutation(
-        context,
-        () => controller.relocateLibrary(library, path),
-      );
-    } catch (error) {
-      if (context.mounted) await _showMutationError(context, error);
-    }
-  }
-
-  Future<void> _removeLibrary(
-    BuildContext context,
-    KontaktLibrary library,
-  ) async {
-    final confirmed =
-        await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            icon: const Icon(
-              Icons.delete_outline_rounded,
-              color: Color(0xFFFF806E),
-            ),
-            title: Text(context.l10n.tr('confirmRemoveTitle')),
-            content: SizedBox(
-              width: 480,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    library.name,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(context.l10n.tr('confirmRemoveMessage')),
-                  const SizedBox(height: 10),
-                  Text(
-                    context.l10n.tr('contentWillRemain'),
-                    style: const TextStyle(color: Color(0xFF61D39A)),
-                  ),
-                ],
-              ),
-            ),
-            actions: _confirmationActions(context, destructive: true),
-          ),
-        ) ??
-        false;
-    if (!confirmed || !context.mounted) return;
-    await _runMutation(context, () => controller.removeLibrary(library));
-  }
-
-  Future<bool> _confirmCandidates(
-    BuildContext context,
-    List<KontaktLibraryCandidate> candidates, {
-    required bool repair,
-  }) async {
-    return await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            icon: Icon(
-              repair ? Icons.build_outlined : Icons.library_add_outlined,
-            ),
-            title: Text(
-              context.l10n.tr(
-                repair ? 'confirmRepairTitle' : 'confirmAddTitle',
-              ),
-            ),
-            content: SizedBox(
-              width: 500,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    context.l10n.tr(
-                      repair ? 'confirmRepairMessage' : 'confirmAddMessage',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 260),
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: candidates.length,
-                      itemBuilder: (context, index) => ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.album_outlined, size: 20),
-                        title: Text(candidates[index].metadata.name),
-                        subtitle: Text(
-                          candidates[index].contentPath,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: _confirmationActions(context),
-          ),
-        ) ??
-        false;
-  }
-
-  List<Widget> _confirmationActions(
-    BuildContext context, {
-    bool destructive = false,
-  }) {
-    return [
-      TextButton(
-        onPressed: () => Navigator.pop(context, false),
-        child: Text(context.l10n.tr('cancel')),
-      ),
-      FilledButton(
-        style: destructive
-            ? FilledButton.styleFrom(backgroundColor: const Color(0xFFB84E43))
-            : null,
-        onPressed: () => Navigator.pop(context, true),
-        child: Text(context.l10n.tr('confirm')),
-      ),
-    ];
-  }
-
-  Future<void> _runMutation(
-    BuildContext context,
-    Future<void> Function() operation,
-  ) async {
-    try {
-      await operation();
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.l10n.tr('operationComplete'))),
-      );
-    } catch (error) {
-      if (context.mounted) await _showMutationError(context, error);
-    }
-  }
-
-  Future<void> _showMutationError(BuildContext context, Object error) {
-    if (error is LibraryAlreadyRegistered) {
-      return _showMessage(
-        context,
-        '${context.l10n.tr('alreadyRegistered')}\n\n${error.libraryName}',
-      );
-    }
-    if (error is PrivilegedHelperRequired) {
-      final unsupported = error.status == PrivilegedHelperStatus.unsupported;
-      return _showMessage(
-        context,
-        context.l10n.tr(
-          unsupported ? 'helperUnsupportedMessage' : 'helperApprovalMessage',
-        ),
-        title: context.l10n.tr('helperApprovalTitle'),
-      );
-    }
-    if (error is PlatformException) {
-      return _showMessage(
-        context,
-        error.message ?? context.l10n.tr('operation_mutation_error_title'),
-        title: context.l10n.tr('operation_mutation_error_title'),
-      );
-    }
-    return _showMessage(context, error.toString());
-  }
-
-  Future<void> _showMessage(
-    BuildContext context,
-    String message, {
-    String? title,
-  }) {
-    return showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Icons.admin_panel_settings_outlined),
-        title: title == null ? null : Text(title),
-        content: SizedBox(width: 440, child: Text(message)),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(context.l10n.tr('close')),
-          ),
-        ],
-      ),
+      selected: controller.isLibrarySelected(library.id),
+      onSelectionChanged: controller.mutationInProgress
+          ? null
+          : (selected) => controller.setLibrarySelected(library.id, selected),
+      onRepair: () => actions.repairLibrary(context, library),
+      onRelocate: () => actions.relocateLibrary(context, library),
+      onRemove: () => actions.removeLibrary(context, library),
     );
   }
 }
@@ -1139,31 +1236,41 @@ class _StatsRow extends StatelessWidget {
         '${controller.totalCount}',
         Icons.album_outlined,
         const Color(0xFF8BA8FF),
+        LibraryFilter.all,
       ),
       _StatData(
         context.l10n.healthy,
         '${controller.healthyCount}',
         Icons.check_circle_outline,
         const Color(0xFF65D5A0),
+        LibraryFilter.healthy,
       ),
       _StatData(
         context.l10n.needsAttention,
         '${controller.attentionCount}',
         Icons.warning_amber_rounded,
         const Color(0xFFFFA46C),
+        LibraryFilter.attention,
       ),
       _StatData(
         context.l10n.offline,
         '${controller.offlineCount}',
         Icons.usb_off_outlined,
         const Color(0xFFD493FF),
+        LibraryFilter.offline,
       ),
     ];
     return Row(
       children: [
         for (var index = 0; index < stats.length; index++) ...[
           if (index > 0) const SizedBox(width: 10),
-          Expanded(child: _StatCard(data: stats[index])),
+          Expanded(
+            child: _StatCard(
+              data: stats[index],
+              selected: controller.filter == stats[index].filter,
+              onTap: () => controller.setFilter(stats[index].filter),
+            ),
+          ),
         ],
       ],
     );
@@ -1171,62 +1278,88 @@ class _StatsRow extends StatelessWidget {
 }
 
 class _StatData {
-  const _StatData(this.label, this.value, this.icon, this.color);
+  const _StatData(this.label, this.value, this.icon, this.color, this.filter);
   final String label;
   final String value;
   final IconData icon;
   final Color color;
+  final LibraryFilter filter;
 }
 
 class _StatCard extends StatelessWidget {
-  const _StatCard({required this.data});
+  const _StatCard({
+    required this.data,
+    required this.selected,
+    required this.onTap,
+  });
   final _StatData data;
+  final bool selected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.klmColors;
-    return Container(
-      height: 82,
-      padding: const EdgeInsets.symmetric(horizontal: 15),
-      decoration: BoxDecoration(
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: data.label,
+      child: Material(
+        key: ValueKey('stat-card-${data.filter.name}'),
         color: colors.card,
-        border: Border.all(color: colors.border),
         borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            height: 82,
+            padding: const EdgeInsets.symmetric(horizontal: 15),
             decoration: BoxDecoration(
-              color: data.color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: selected ? data.color : colors.border,
+                width: selected ? 1.5 : 1,
+              ),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(data.icon, color: data.color, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Flexible(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                Text(
-                  data.value,
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: data.color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
                   ),
+                  child: Icon(data.icon, color: data.color, size: 20),
                 ),
-                Text(
-                  data.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: colors.secondaryText, fontSize: 11),
+                const SizedBox(width: 12),
+                Flexible(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        data.value,
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        data.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: colors.secondaryText,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1250,6 +1383,25 @@ class _InventoryToolbar extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 10),
+        IconButton(
+          key: const ValueKey('select-visible-libraries'),
+          tooltip: context.l10n.tr(
+            controller.allVisibleLibrariesSelected
+                ? 'clearSelection'
+                : 'selectVisible',
+          ),
+          onPressed: controller.visibleLibraries.isEmpty
+              ? null
+              : () => controller.setVisibleLibrariesSelected(
+                  !controller.allVisibleLibrariesSelected,
+                ),
+          icon: Icon(
+            controller.allVisibleLibrariesSelected
+                ? Icons.deselect_rounded
+                : Icons.select_all_rounded,
+          ),
+        ),
+        const SizedBox(width: 2),
         PopupMenuButton<LibraryFilter>(
           initialValue: controller.filter,
           onSelected: controller.setFilter,
@@ -1362,6 +1514,8 @@ class _LibraryCard extends StatelessWidget {
     required this.onRepair,
     required this.onRelocate,
     required this.onRemove,
+    required this.selected,
+    required this.onSelectionChanged,
     this.dragHandle,
   });
 
@@ -1371,6 +1525,8 @@ class _LibraryCard extends StatelessWidget {
   final VoidCallback onRepair;
   final VoidCallback onRelocate;
   final VoidCallback onRemove;
+  final bool selected;
+  final ValueChanged<bool>? onSelectionChanged;
   final Widget? dragHandle;
 
   @override
@@ -1389,6 +1545,14 @@ class _LibraryCard extends StatelessWidget {
       ),
       child: Row(
         children: [
+          Checkbox(
+            key: ValueKey('select-library-${library.id}'),
+            value: selected,
+            onChanged: onSelectionChanged == null
+                ? null
+                : (value) => onSelectionChanged!(value ?? false),
+            visualDensity: VisualDensity.compact,
+          ),
           if (dragHandle != null) ...[dragHandle!, const SizedBox(width: 2)],
           Container(
             width: 44,
@@ -1590,8 +1754,9 @@ class _HealthChip extends StatelessWidget {
 }
 
 class _DiagnosticsView extends StatelessWidget {
-  const _DiagnosticsView({required this.controller});
+  const _DiagnosticsView({required this.controller, required this.actions});
   final LibraryInventoryController controller;
+  final _LibraryActionController actions;
 
   @override
   Widget build(BuildContext context) {
@@ -1637,6 +1802,10 @@ class _DiagnosticsView extends StatelessWidget {
                       for (final library in libraries)
                         for (final issue in library.issues)
                           _DiagnosticTile(
+                            library: library,
+                            actions: actions,
+                            actionKey:
+                                'diagnostic-actions-${library.id}-${issue.code}',
                             title: library.name,
                             message: context.l10n.issueMessage(
                               issue.code,
@@ -1661,11 +1830,17 @@ class _DiagnosticTile extends StatelessWidget {
     required this.title,
     required this.message,
     required this.severity,
+    this.library,
+    this.actions,
+    this.actionKey,
     this.suffix,
   });
   final String title;
   final String message;
   final IssueSeverity severity;
+  final KontaktLibrary? library;
+  final _LibraryActionController? actions;
+  final String? actionKey;
   final String? suffix;
 
   @override
@@ -1718,8 +1893,82 @@ class _DiagnosticTile extends StatelessWidget {
               suffix!,
               style: TextStyle(color: colors.tertiaryText, fontSize: 11),
             ),
+          if (library != null && actions != null) ...[
+            const SizedBox(width: 8),
+            _DiagnosticActionsMenu(
+              actionKey: actionKey,
+              library: library!,
+              actions: actions!,
+            ),
+          ],
         ],
       ),
+    );
+  }
+}
+
+class _DiagnosticActionsMenu extends StatelessWidget {
+  const _DiagnosticActionsMenu({
+    required this.actionKey,
+    required this.library,
+    required this.actions,
+  });
+
+  final String? actionKey;
+  final KontaktLibrary library;
+  final _LibraryActionController actions;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<String>(
+      key: actionKey == null ? null : ValueKey(actionKey),
+      tooltip: context.l10n.tr('actions'),
+      icon: Icon(Icons.more_horiz_rounded, color: context.klmColors.mutedIcon),
+      onSelected: (value) {
+        if (value == 'reveal') actions.revealLibrary(context, library);
+        if (value == 'repair') actions.repairLibrary(context, library);
+        if (value == 'relocate') actions.relocateLibrary(context, library);
+        if (value == 'remove') actions.removeLibrary(context, library);
+      },
+      itemBuilder: (_) => [
+        if (library.contentPath != null)
+          PopupMenuItem(
+            value: 'reveal',
+            child: ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.folder_open_outlined),
+              title: Text(context.l10n.tr('showInFolder')),
+            ),
+          ),
+        PopupMenuItem(
+          value: 'repair',
+          child: ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.build_outlined),
+            title: Text(context.l10n.tr('repairRecords')),
+          ),
+        ),
+        PopupMenuItem(
+          value: 'relocate',
+          child: ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.drive_file_move_outline),
+            title: Text(context.l10n.tr('relocateLibrary')),
+          ),
+        ),
+        PopupMenuItem(
+          value: 'remove',
+          child: ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.delete_outline_rounded),
+            title: Text(context.l10n.tr('removeRecords')),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1872,7 +2121,7 @@ class _LanguageSettingsCard extends StatelessWidget {
                 (language) => DropdownMenuItem(
                   value: language,
                   child: Text(
-                    context.l10n.languageName(language.tag),
+                    language.nativeName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
