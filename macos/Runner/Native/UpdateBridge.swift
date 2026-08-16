@@ -213,6 +213,7 @@ final class UpdateBridge: NSObject, SPUUpdaterDelegate {
     result([
       "version": item.displayVersionString,
       "build": item.versionString,
+      "releaseNotes": item.itemDescription ?? "",
     ])
   }
 

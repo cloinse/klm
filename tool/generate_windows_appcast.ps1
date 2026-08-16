@@ -3,7 +3,8 @@ param(
   [Parameter(Mandatory = $true)][string]$OutputPath,
   [Parameter(Mandatory = $true)][string]$Version,
   [Parameter(Mandatory = $true)][string]$Build,
-  [Parameter(Mandatory = $true)][string]$WinSparkleTool
+  [Parameter(Mandatory = $true)][string]$WinSparkleTool,
+  [Parameter(Mandatory = $false)][string]$ReleaseNotesPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -21,7 +22,18 @@ if (-not (Test-Path -LiteralPath $WinSparkleTool -PathType Leaf)) {
 
 $PrivateKeyPath = $env:KLM_SPARKLE_PRIVATE_KEY_FILE
 $TemporaryKeyPath = $null
+$ReleaseNotes = $null
 try {
+  if (-not [string]::IsNullOrWhiteSpace($ReleaseNotesPath)) {
+    if (-not (Test-Path -LiteralPath $ReleaseNotesPath -PathType Leaf)) {
+      throw "Release notes not found: $ReleaseNotesPath"
+    }
+    $ReleaseNotes = [IO.File]::ReadAllText($ReleaseNotesPath).Trim()
+    if ($ReleaseNotes.Contains(']]>')) {
+      throw 'Release notes cannot contain the CDATA terminator.'
+    }
+  }
+
   if (-not [string]::IsNullOrWhiteSpace($env:KLM_SPARKLE_PRIVATE_KEY)) {
     $TemporaryKeyPath = Join-Path ([IO.Path]::GetTempPath()) (
       'klm-sparkle-key-' + [Guid]::NewGuid().ToString('N'))
@@ -71,6 +83,13 @@ try {
       'sparkle', 'shortVersionString', $SparkleNamespace, $Version)
     $Writer.WriteElementString(
       'sparkle', 'minimumSystemVersion', $SparkleNamespace, '10.0')
+    if (-not [string]::IsNullOrWhiteSpace($ReleaseNotes)) {
+      $Writer.WriteStartElement('description')
+      $Writer.WriteAttributeString(
+        'sparkle', 'format', $SparkleNamespace, 'plain-text')
+      $Writer.WriteCData($ReleaseNotes)
+      $Writer.WriteEndElement()
+    }
     $Writer.WriteStartElement('enclosure')
     $Writer.WriteAttributeString('url', $DownloadUrl)
     $Writer.WriteAttributeString('length', $Installer.Length.ToString())

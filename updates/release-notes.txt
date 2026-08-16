@@ -1,0 +1,6 @@
+- Added Simplified Chinese interface support.
+- Added Chinese to the language selector and language preference storage.
+- Added a “What’s New” section to the update dialog.
+- Release notes are now displayed before installing an available update.
+- Added release notes support for macOS and Windows update feeds.
+- Improved the update publishing workflow to embed release notes in appcasts.

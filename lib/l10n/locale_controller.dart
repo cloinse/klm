@@ -4,7 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 enum AppLanguage {
   english(Locale('en')),
   spanish(Locale('es')),
-  portugueseBrazil(Locale('pt', 'BR'));
+  portugueseBrazil(Locale('pt', 'BR')),
+  chineseSimplified(Locale('zh'));
 
   const AppLanguage(this.locale);
 
@@ -14,6 +15,7 @@ enum AppLanguage {
     return switch (tag) {
       'es' => AppLanguage.spanish,
       'pt_BR' => AppLanguage.portugueseBrazil,
+      'zh' => AppLanguage.chineseSimplified,
       _ => AppLanguage.english,
     };
   }
@@ -22,6 +24,7 @@ enum AppLanguage {
     AppLanguage.english => 'en',
     AppLanguage.spanish => 'es',
     AppLanguage.portugueseBrazil => 'pt_BR',
+    AppLanguage.chineseSimplified => 'zh',
   };
 }
 

@@ -110,17 +110,37 @@ class _LibraryDashboardState extends State<LibraryDashboard> {
     AppUpdateInfo info,
     AvailableAppUpdate update,
   ) {
+    final releaseNotes = update.releaseNotes.trim();
     return showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         key: const ValueKey('update-available-dialog'),
         icon: const Icon(Icons.system_update_alt_rounded),
         title: Text(context.l10n.tr('updateAvailable')),
-        content: Text(
-          context.l10n.format('updateAvailableMessage', {
-            'version': update.version,
-            'currentVersion': info.currentVersion,
-          }),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520, maxHeight: 380),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  context.l10n.format('updateAvailableMessage', {
+                    'version': update.version,
+                    'currentVersion': info.currentVersion,
+                  }),
+                ),
+                if (releaseNotes.isNotEmpty) ...[
+                  const SizedBox(height: 20),
+                  Text(
+                    context.l10n.tr('releaseNotes'),
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(releaseNotes),
+                ],
+              ],
+            ),
+          ),
         ),
         actions: [
           FilledButton(

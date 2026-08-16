@@ -10,6 +10,19 @@ always reports its result: it either shows the available and installed version
 or confirms that KLM is up to date. The sidebar notice opens the same dialog;
 installation starts only after the user selects Install update.
 
+## Release notes
+
+The in-app update dialog displays the plain-text contents of:
+
+```text
+updates/release-notes.txt
+```
+
+Add the bullet list for the release before starting either Codemagic release
+workflow. The macOS and Windows appcast generators embed that file as the
+appcast item's description; macOS signs the appcast after embedding it. If the
+file is absent, the update still works but the dialog has no changes section.
+
 ## Distribution rules
 
 - Release and Profile builds only run from `/Applications`.

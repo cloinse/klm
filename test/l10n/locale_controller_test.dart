@@ -23,4 +23,16 @@ void main() {
     expect(restored.locale.languageCode, 'pt');
     expect(restored.locale.countryCode, 'BR');
   });
+
+  test('persists Simplified Chinese selection', () async {
+    SharedPreferences.setMockInitialValues({});
+    final controller = await LocaleController.load();
+
+    await controller.setLanguage(AppLanguage.chineseSimplified);
+    final restored = await LocaleController.load();
+
+    expect(restored.language, AppLanguage.chineseSimplified);
+    expect(restored.locale.languageCode, 'zh');
+    expect(restored.locale.countryCode, isNull);
+  });
 }

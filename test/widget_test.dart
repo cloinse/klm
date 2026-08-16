@@ -83,7 +83,12 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     final localeController = LocaleController();
     final updatePlatform = _FakeAppUpdatePlatform(
-      availableUpdate: const AvailableAppUpdate(version: '1.1.0', build: '2'),
+      availableUpdate: const AvailableAppUpdate(
+        version: '1.1.0',
+        build: '2',
+        releaseNotes:
+            '- Muestra los cambios antes de instalar.\n- Mejoras de estabilidad.',
+      ),
     );
     addTearDown(localeController.dispose);
     await localeController.setLanguage(AppLanguage.spanish);
@@ -116,6 +121,13 @@ void main() {
       find.text(
         'Kontakt Library Manager 1.1.0 ya está disponible '
         '(tienes la versión 1.0.0).',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Cambios de esta versión'), findsOneWidget);
+    expect(
+      find.text(
+        '- Muestra los cambios antes de instalar.\n- Mejoras de estabilidad.',
       ),
       findsOneWidget,
     );

@@ -9,6 +9,10 @@ void main() {
     <item>
       <sparkle:version>5</sparkle:version>
       <sparkle:shortVersionString>0.1.4</sparkle:shortVersionString>
+      <description sparkle:format="plain-text"><![CDATA[
+        New features
+        - Shows release notes before installing.
+      ]]></description>
       <enclosure
         url="https://github.com/cloinse/klm/releases/download/v0.1.4/setup.exe"
         sparkle:os="windows-x64"
@@ -27,6 +31,10 @@ void main() {
 
     expect(update?.version, '0.1.4');
     expect(update?.build, '5');
+    expect(
+      update?.releaseNotes,
+      'New features\n        - Shows release notes before installing.',
+    );
   });
 
   test('visible version omits Flutter internal build number', () {

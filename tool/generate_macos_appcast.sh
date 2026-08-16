@@ -8,6 +8,7 @@ KLM_ARCHIVES_DIRECTORY="${1:?Pass the directory containing the update DMG}"
 KLM_APPCAST_PATH="${2:?Pass the output appcast path}"
 KLM_DOWNLOAD_URL_PREFIX="${KLM_UPDATE_DOWNLOAD_URL_PREFIX:?Set KLM_UPDATE_DOWNLOAD_URL_PREFIX}"
 KLM_DOWNLOAD_URL_PREFIX="${KLM_DOWNLOAD_URL_PREFIX%/}/"
+KLM_RELEASE_NOTES_PATH="${KLM_RELEASE_NOTES_PATH:-}"
 
 test -d "$KLM_ARCHIVES_DIRECTORY"
 /bin/mkdir -p "$(/usr/bin/dirname "$KLM_APPCAST_PATH")"
@@ -48,13 +49,38 @@ verify_appcast() {
     "$KLM_APPCAST_PATH"
 }
 
+embed_release_notes() {
+  test -z "$KLM_RELEASE_NOTES_PATH" && return 0
+  test -f "$KLM_RELEASE_NOTES_PATH"
+  ! /usr/bin/grep -Fq ']]>' "$KLM_RELEASE_NOTES_PATH"
+
+  KLM_APPCAST_WITH_NOTES="$KLM_APPCAST_PATH.with-notes"
+  /usr/bin/awk -v notes_path="$KLM_RELEASE_NOTES_PATH" '
+    !inserted && /<enclosure[ >]/ {
+      print "<description sparkle:format=\"plain-text\"><![CDATA["
+      while ((getline line < notes_path) > 0) print line
+      close(notes_path)
+      print "]]></description>"
+      inserted = 1
+    }
+    { print }
+  ' "$KLM_APPCAST_PATH" > "$KLM_APPCAST_WITH_NOTES"
+  /bin/mv "$KLM_APPCAST_WITH_NOTES" "$KLM_APPCAST_PATH"
+}
+
 if test -n "${KLM_SPARKLE_PRIVATE_KEY:-}"; then
   /usr/bin/printf '%s' "$KLM_SPARKLE_PRIVATE_KEY" | generate_appcast
-  /usr/bin/printf '%s' "$KLM_SPARKLE_PRIVATE_KEY" | verify_appcast
 else
   KLM_PRIVATE_KEY_FILE="${KLM_SPARKLE_PRIVATE_KEY_FILE:-.secrets/KLM_SPARKLE_PRIVATE_KEY}"
   test -s "$KLM_PRIVATE_KEY_FILE"
   /bin/cat "$KLM_PRIVATE_KEY_FILE" | generate_appcast
+fi
+
+embed_release_notes
+
+if test -n "${KLM_SPARKLE_PRIVATE_KEY:-}"; then
+  /usr/bin/printf '%s' "$KLM_SPARKLE_PRIVATE_KEY" | verify_appcast
+else
   /bin/cat "$KLM_PRIVATE_KEY_FILE" | verify_appcast
 fi
 

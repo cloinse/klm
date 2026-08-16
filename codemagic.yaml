@@ -213,6 +213,12 @@ workflows:
           KLM_PACKAGE_NAME="klm-macos-v${KLM_VERSION}"
           KLM_OUTPUT_DIRECTORY="build/macos-release/$KLM_PACKAGE_NAME"
           export KLM_UPDATE_DOWNLOAD_URL_PREFIX="https://github.com/cloinse/klm/releases/download/v${KLM_VERSION}"
+          KLM_RELEASE_NOTES_PATH="$CM_BUILD_DIR/updates/release-notes.txt"
+          if test -f "$KLM_RELEASE_NOTES_PATH"; then
+            export KLM_RELEASE_NOTES_PATH
+          else
+            unset KLM_RELEASE_NOTES_PATH
+          fi
           tool/generate_macos_appcast.sh \
             "$KLM_OUTPUT_DIRECTORY" \
             "$KLM_OUTPUT_DIRECTORY/appcast-macos-legacy.xml"
@@ -410,13 +416,20 @@ workflows:
             "https://github.com/cloinse/klm/releases/download/v$Version"
           $WinSparkleTool = Join-Path $env:USERPROFILE `
             '.klm-tools\winsparkle-0.9.4\winsparkle-tool.exe'
+          $ReleaseNotesArgs = @()
+          $ReleaseNotesPath = Join-Path $env:CM_BUILD_DIR `
+            'updates\release-notes.txt'
+          if (Test-Path -LiteralPath $ReleaseNotesPath -PathType Leaf) {
+            $ReleaseNotesArgs = @('-ReleaseNotesPath', $ReleaseNotesPath)
+          }
           $Appcast = Join-Path $OutputDirectory 'appcast-windows.xml'
           & 'tool\generate_windows_appcast.ps1' `
             -InstallerPath $Installer `
             -OutputPath $Appcast `
             -Version $Version `
             -Build $Build `
-            -WinSparkleTool $WinSparkleTool
+            -WinSparkleTool $WinSparkleTool `
+            @ReleaseNotesArgs
           if ($LASTEXITCODE -ne 0 -or -not (Test-Path $Appcast)) {
             throw 'The signed Windows appcast was not created.'
           }

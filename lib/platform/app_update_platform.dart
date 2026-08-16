@@ -17,10 +17,15 @@ class AppUpdateInfo {
 }
 
 class AvailableAppUpdate {
-  const AvailableAppUpdate({required this.version, this.build = ''});
+  const AvailableAppUpdate({
+    required this.version,
+    this.build = '',
+    this.releaseNotes = '',
+  });
 
   final String version;
   final String build;
+  final String releaseNotes;
 }
 
 abstract interface class AppUpdatePlatform {
@@ -65,6 +70,7 @@ class MacOSAppUpdatePlatform implements AppUpdatePlatform {
     return AvailableAppUpdate(
       version: version,
       build: result?['build'] as String? ?? '',
+      releaseNotes: result?['releaseNotes'] as String? ?? '',
     );
   }
 }
@@ -165,7 +171,11 @@ AvailableAppUpdate? windowsAppcastAvailableUpdate(
               ?.innerText
               .trim();
           if (version?.isNotEmpty == true) {
-            return AvailableAppUpdate(version: version!, build: build ?? '');
+            return AvailableAppUpdate(
+              version: version!,
+              build: build ?? '',
+              releaseNotes: _releaseNotesFromItem(item),
+            );
           }
         }
         continue;
@@ -177,11 +187,22 @@ AvailableAppUpdate? windowsAppcastAvailableUpdate(
           ?.innerText
           .trim();
       if (version != null && _compareVersions(version, currentVersion) > 0) {
-        return AvailableAppUpdate(version: version, build: build ?? '');
+        return AvailableAppUpdate(
+          version: version,
+          build: build ?? '',
+          releaseNotes: _releaseNotesFromItem(item),
+        );
       }
     }
   }
   return null;
+}
+
+String _releaseNotesFromItem(XmlElement item) {
+  final description = item.findElements('description').firstOrNull?.innerText;
+  if (description == null) return '';
+
+  return description.replaceAll('\r\n', '\n').replaceAll('\r', '\n').trim();
 }
 
 int _compareVersions(String left, String right) {
