@@ -4,23 +4,22 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     <channel>
         <title>Kontakt Library Manager</title>
         <item>
-            <title>0.2.4</title>
-            <pubDate>Sun, 16 Aug 2026 21:31:38 +0000</pubDate>
-            <sparkle:version>16</sparkle:version>
-            <sparkle:shortVersionString>0.2.4</sparkle:shortVersionString>
+            <title>0.2.5</title>
+            <pubDate>Sun, 16 Aug 2026 22:05:00 +0000</pubDate>
+            <sparkle:version>17</sparkle:version>
+            <sparkle:shortVersionString>0.2.5</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>10.15</sparkle:minimumSystemVersion>
 <description sparkle:format="plain-text"><![CDATA[
-- Added Simplified Chinese interface support.
-- Added Chinese to the language selector and language preference storage.
-- Added a “What’s New” section to the update dialog.
-- Release notes are now displayed before installing an available update.
-- Added release notes support for macOS and Windows update feeds.
-- Improved the update publishing workflow to embed release notes in appcasts.
+- Added clickable status cards to filter libraries by Healthy, Needs Attention, Offline, or Total.
+- Added multi-selection and batch removal for library records, with confirmation and classic-order preservation.
+- Added direct library actions to Diagnostics, including showing the folder, repairing, relocating, and removing records.
+- Improved batch-removal recovery so the inventory stays synchronized after partial platform failures.
+- Preserved native language names in the language selector, including English, Español, Português (Brasil), and 简体中文.
 ]]></description>
-            <enclosure url="https://github.com/cloinse/klm/releases/download/v0.2.4/klm-macos-v0.2.4.dmg" length="21682963" type="application/octet-stream" sparkle:edSignature="fbABKb14aS4H+f8LEuJtBRgsDiLRZHByZ8phqv39nUlEuhkdndRyOUySHFznOKd8INe1xAD9qZsW1OhO+dhWAw=="></enclosure>
+            <enclosure url="https://github.com/cloinse/klm/releases/download/v0.2.5/klm-macos-v0.2.5.dmg" length="21702195" type="application/octet-stream" sparkle:edSignature="1D98CKx+OK8SsfyaWAOeJ0C8JujYseYNC4IkP0hC2IPWe4fD0hZK3Q3/i4TKZEydSWB0zkiOUrQEpQXc0iE3Bw=="></enclosure>
         </item>
     </channel>
 </rss><!-- sparkle-signatures:
-edSignature: xrFqlkEWivRv8cGccJ6MHy81fhoHhxtG/cyVPesb3nW1wvP03DpnVQhEGnaQEpSjYF1XrrEMr2zLhoKtXSnrAg==
-length: 1520
+edSignature: 6pwoY2t6VWeTHhiqHUT9enCKETVcNnSz3EUXk5nnBnDUl3ei3iwqZGfFd9QWAgcd+GEoK+SKmfz3DJc520LfAQ==
+length: 1689
 -->
