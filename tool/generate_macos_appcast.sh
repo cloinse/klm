@@ -42,6 +42,12 @@ generate_appcast() {
     "$KLM_ARCHIVES_DIRECTORY"
 }
 
+sign_appcast() {
+  "$KLM_SPARKLE_ROOT/bin/sign_update" \
+    --ed-key-file - \
+    "$KLM_APPCAST_PATH"
+}
+
 verify_appcast() {
   "$KLM_SPARKLE_ROOT/bin/sign_update" \
     --verify \
@@ -79,8 +85,10 @@ fi
 embed_release_notes
 
 if test -n "${KLM_SPARKLE_PRIVATE_KEY:-}"; then
+  /usr/bin/printf '%s' "$KLM_SPARKLE_PRIVATE_KEY" | sign_appcast
   /usr/bin/printf '%s' "$KLM_SPARKLE_PRIVATE_KEY" | verify_appcast
 else
+  /bin/cat "$KLM_PRIVATE_KEY_FILE" | sign_appcast
   /bin/cat "$KLM_PRIVATE_KEY_FILE" | verify_appcast
 fi
 
