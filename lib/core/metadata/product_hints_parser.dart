@@ -69,10 +69,12 @@ class ProductHintsParser {
     _validateFilenameValue(name, 'Name');
     _validateFilenameValue(regKey, 'RegKey');
     String? minimumVersion;
+    final applications = <String>{};
     for (final application in product.findAllElements('Application')) {
-      if (application.innerText.trim().toLowerCase() == 'kontakt') {
+      final applicationName = application.innerText.trim().toLowerCase();
+      if (applicationName.isNotEmpty) applications.add(applicationName);
+      if (applicationName == 'kontakt') {
         minimumVersion = _nullable(application.getAttribute('minVersion'));
-        break;
       }
     }
 
@@ -86,6 +88,9 @@ class ProductHintsParser {
       upid: _nullable(_value(product, 'UPID')),
       authSystem: _nullable(_value(product, 'AuthSystem')),
       minimumKontaktVersion: minimumVersion,
+      productType: _nullable(_value(product, 'Type')),
+      company: _nullable(_value(product, 'Company')),
+      applications: Set<String>.unmodifiable(applications),
     );
     final serializedXml = document.toXmlString(pretty: true, indent: '  ');
     return ProductHintsDocument(

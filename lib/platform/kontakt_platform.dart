@@ -68,10 +68,30 @@ abstract class KontaktPlatform {
     KontaktLibraryCandidate candidate,
   );
 
+  Future<List<KontaktMutationResult>> upsertLibraries(
+    List<KontaktLibraryCandidate> candidates,
+  ) async {
+    final results = <KontaktMutationResult>[];
+    for (final candidate in candidates) {
+      results.add(await upsertLibrary(candidate));
+    }
+    return results;
+  }
+
   Future<KontaktMutationResult> relocateLibrary(
     KontaktLibrary library,
     String contentPath,
   );
 
   Future<KontaktMutationResult> removeLibrary(KontaktLibrary library);
+
+  Future<List<KontaktMutationResult>> removeLibraries(
+    List<KontaktLibrary> libraries,
+  ) async {
+    final results = <KontaktMutationResult>[];
+    for (final library in libraries) {
+      results.add(await removeLibrary(library));
+    }
+    return results;
+  }
 }

@@ -65,6 +65,15 @@ class KontaktMutationRequest {
     });
   }
 
+  factory KontaktMutationRequest.batch(
+    Iterable<Map<String, Object>> operations,
+  ) {
+    return KontaktMutationRequest._({
+      'version': 1,
+      'operations': operations.toList(growable: false),
+    });
+  }
+
   final Map<String, Object> payload;
 }
 
@@ -91,5 +100,14 @@ class KontaktMutationResult {
           .whereType<String>()
           .toList(growable: false),
     );
+  }
+
+  static List<KontaktMutationResult> listFromMap(Map<Object?, Object?> map) {
+    final results = map['results'];
+    if (results is! List) return [KontaktMutationResult.fromMap(map)];
+    return results
+        .whereType<Map>()
+        .map((result) => KontaktMutationResult.fromMap(result))
+        .toList(growable: false);
   }
 }

@@ -67,8 +67,18 @@ class UnsupportedKontaktPlatform implements KontaktPlatform {
       _unsupported();
 
   @override
+  Future<List<KontaktMutationResult>> removeLibraries(
+    List<KontaktLibrary> libraries,
+  ) => _unsupported();
+
+  @override
   Future<KontaktMutationResult> upsertLibrary(
     KontaktLibraryCandidate candidate,
+  ) => _unsupported();
+
+  @override
+  Future<List<KontaktMutationResult>> upsertLibraries(
+    List<KontaktLibraryCandidate> candidates,
   ) => _unsupported();
 
   Future<T> _unsupported<T>() {

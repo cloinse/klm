@@ -91,6 +91,13 @@ workflows:
             -o "$KLM_LOCATION_TEST"
           "$KLM_LOCATION_TEST"
           /bin/rm "$KLM_LOCATION_TEST"
+          KLM_MUTATION_TEST="$(/usr/bin/mktemp /tmp/klm-mutation-test.XXXXXX)"
+          xcrun swiftc \
+            macos/KontaktLibraryHelper/KontaktHelperService.swift \
+            test/native_helper/main.swift \
+            -o "$KLM_MUTATION_TEST"
+          "$KLM_MUTATION_TEST"
+          /bin/rm "$KLM_MUTATION_TEST"
 
       - name: Build universal macOS Release
         script: flutter build macos --release --no-pub
@@ -286,6 +293,18 @@ workflows:
       - name: Prepare verified Windows packaging tools
         script: |
           $ErrorActionPreference = 'Stop'
+
+          $ParserTokens = $null
+          $ParserErrors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path 'windows\runner\KontaktLibraryHelper.ps1'),
+            [ref]$ParserTokens,
+            [ref]$ParserErrors
+          ) | Out-Null
+          if ($ParserErrors.Count -ne 0) {
+            $ParserErrors | ForEach-Object { Write-Error $_.Message }
+            throw 'Windows helper syntax validation failed.'
+          }
 
           $HelperSmokeResponse = Join-Path $env:TEMP 'klm-helper-smoke.json'
           Remove-Item $HelperSmokeResponse -Force -ErrorAction SilentlyContinue

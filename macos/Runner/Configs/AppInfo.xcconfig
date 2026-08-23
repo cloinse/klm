@@ -11,7 +11,7 @@ PRODUCT_NAME = Kontakt Library Manager
 PRODUCT_BUNDLE_IDENTIFIER = com.juanayala.kontaktLibraryManager
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2026 Juan Ayala. All rights reserved.
+PRODUCT_COPYRIGHT = KLM v$(FLUTTER_BUILD_NAME) cloin.se
 
 // Sparkle checks only while KLM is open. Every distributed build uses the
 // universal Catalina-compatible update channel.

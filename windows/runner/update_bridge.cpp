@@ -100,7 +100,7 @@ bool UpdateBridge::LoadWinSparkle() {
   if (!loaded || set_public_key(kPublicKey) != 1) return false;
 
   set_appcast_url(kFeedUrl);
-  set_app_details(L"Juan Ayala", L"Kontakt Library Manager",
+  set_app_details(L"cloin.se", L"Kontakt Library Manager",
                   KLM_WIDEN(KLM_DISPLAY_VERSION));
   set_build_version(KLM_WIDEN(KLM_STRINGIFY(FLUTTER_VERSION_BUILD)));
   set_automatic_checks(0);

@@ -87,6 +87,47 @@ otros datos
     expect(document.xml, contains('<Visibility type="Number">3</Visibility>'));
   });
 
+  test('classifies Kontakt content separately from third-party plugins', () {
+    const kontaktXml = '''
+<ProductHints><Product>
+  <Name>Noire</Name><RegKey>Noire</RegKey><SNPID>K07</SNPID>
+  <Type>Content</Type><Company>Native Instruments GmbH</Company>
+  <Relevance><Application minVersion="6.0">Kontakt</Application></Relevance>
+</Product></ProductHints>
+''';
+    const pluginXml = '''
+<ProductHints><Product>
+  <Name>Arturia Plugin</Name><RegKey>Arturia Plugin</RegKey><SNPID>A01</SNPID>
+  <Type>Plugin</Type><Company>Arturia</Company>
+  <Relevance><Application>Kontakt</Application><Application>Maschine</Application></Relevance>
+</Product></ProductHints>
+''';
+
+    final kontakt = parser.parseText(kontaktXml);
+    final plugin = parser.parseText(pluginXml);
+
+    expect(kontakt.productType, 'Content');
+    expect(kontakt.company, 'Native Instruments GmbH');
+    expect(kontakt.applications, contains('kontakt'));
+    expect(kontakt.isKontaktLibraryMetadata, isTrue);
+    expect(plugin.applications, containsAll(['kontakt', 'maschine']));
+    expect(plugin.isKontaktLibraryMetadata, isFalse);
+  });
+
+  test('accepts legacy Kontakt content without an Application element', () {
+    const xml = '''
+<ProductHints><Product>
+  <Name>Legacy Library</Name><RegKey>Legacy Library</RegKey><SNPID>ZA1</SNPID>
+  <Type>Content</Type><Company>Legacy Developer</Company>
+</Product></ProductHints>
+''';
+
+    final metadata = parser.parseText(xml);
+
+    expect(metadata.applications, isEmpty);
+    expect(metadata.isKontaktLibraryMetadata, isTrue);
+  });
+
   test('rechaza metadata sin campos obligatorios', () {
     const xml =
         '<ProductHints><Product><Name>A</Name></Product></ProductHints>';

@@ -17,6 +17,18 @@ void main() {
     expect(updateBridge, contains('item.displayVersionString'));
   });
 
+  test('macOS About panel uses versioned cloin.se branding', () {
+    final appInfo = File(
+      'macos/Runner/Configs/AppInfo.xcconfig',
+    ).readAsStringSync();
+
+    expect(
+      appInfo,
+      contains(r'PRODUCT_COPYRIGHT = KLM v$(FLUTTER_BUILD_NAME) cloin.se'),
+    );
+    expect(appInfo, isNot(contains('Juan Ayala')));
+  });
+
   test('Codemagic packages exactly three macOS release files in one ZIP', () {
     final codemagic = File('codemagic.yaml').readAsStringSync();
 

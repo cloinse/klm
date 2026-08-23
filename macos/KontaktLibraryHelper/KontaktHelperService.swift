@@ -29,8 +29,59 @@ enum MutationTransaction {
     guard requestData.count <= 2_500_000,
           let object = try JSONSerialization.jsonObject(with: requestData)
             as? [String: Any],
-          object["version"] as? Int == 1,
-          let operation = object["operation"] as? String,
+          object["version"] as? Int == 1
+    else {
+      throw MutationError.invalidRequest("missing or unsafe fields")
+    }
+
+    if let operations = object["operations"] as? [[String: Any]] {
+      guard !operations.isEmpty, operations.count <= 1_000 else {
+        throw MutationError.invalidRequest("invalid batch size")
+      }
+      let plans = try operations.map {
+        try mutationPlan($0, locations: locations)
+      }
+      let mutations = plans.flatMap(\.mutations)
+      var targetIndexes: [String: Int] = [:]
+      var uniqueMutations: [FileMutation] = []
+      for mutation in mutations {
+        let targetPath = mutation.url.path.lowercased()
+        if let existingIndex = targetIndexes[targetPath] {
+          guard uniqueMutations[existingIndex].data == mutation.data else {
+            throw MutationError.invalidRequest("conflicting mutation targets")
+          }
+          continue
+        }
+        targetIndexes[targetPath] = uniqueMutations.count
+        uniqueMutations.append(mutation)
+      }
+      _ = try apply(uniqueMutations)
+      return [
+        "operation": "batch",
+        "results": plans.map { plan in
+          [
+            "operation": plan.operation,
+            "libraryName": plan.name,
+            "changedPaths": plan.mutations.map { $0.url.path },
+          ]
+        },
+      ]
+    }
+
+    let plan = try mutationPlan(object, locations: locations)
+    let changedPaths = try apply(plan.mutations)
+    return [
+      "operation": plan.operation,
+      "libraryName": plan.name,
+      "changedPaths": changedPaths,
+    ]
+  }
+
+  private static func mutationPlan(
+    _ object: [String: Any],
+    locations: MutationLocations
+  ) throws -> MutationPlan {
+    guard let operation = object["operation"] as? String,
           let name = safeComponent(object["name"] as? String),
           let regKey = safeComponent(object["regKey"] as? String)
     else {
@@ -67,13 +118,7 @@ enum MutationTransaction {
     default:
       throw MutationError.invalidRequest("unknown operation")
     }
-
-    let changedPaths = try apply(mutations)
-    return [
-      "operation": operation,
-      "libraryName": name,
-      "changedPaths": changedPaths,
-    ]
+    return MutationPlan(operation: operation, name: name, mutations: mutations)
   }
 
   private static func upsertMutations(
@@ -323,6 +368,12 @@ struct MutationLocations {
 private struct FileMutation {
   let url: URL
   let data: Data?
+}
+
+private struct MutationPlan {
+  let operation: String
+  let name: String
+  let mutations: [FileMutation]
 }
 
 private enum BackupState {

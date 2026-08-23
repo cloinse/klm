@@ -135,6 +135,9 @@ class ProductMetadata {
     this.upid,
     this.authSystem,
     this.minimumKontaktVersion,
+    this.productType,
+    this.company,
+    this.applications = const <String>{},
   });
 
   final String name;
@@ -146,4 +149,13 @@ class ProductMetadata {
   final String? upid;
   final String? authSystem;
   final String? minimumKontaktVersion;
+  final String? productType;
+  final String? company;
+  final Set<String> applications;
+
+  bool get isKontaktLibraryMetadata {
+    final normalizedType = productType?.trim().toLowerCase();
+    if (normalizedType == 'plugin') return false;
+    return normalizedType == 'content' || applications.contains('kontakt');
+  }
 }

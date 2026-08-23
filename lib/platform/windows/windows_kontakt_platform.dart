@@ -8,17 +8,30 @@ import 'package:kontakt_library_manager/core/metadata/product_hints_parser.dart'
 import 'package:kontakt_library_manager/core/models/kontakt_library.dart';
 import 'package:kontakt_library_manager/core/models/kontakt_mutation.dart';
 import 'package:kontakt_library_manager/core/validation/library_validator.dart';
+import 'package:kontakt_library_manager/core/validation/classic_order_validator.dart';
 import 'package:kontakt_library_manager/features/mutations/library_candidate_scanner.dart';
 import 'package:kontakt_library_manager/platform/inventory_assembler.dart';
 import 'package:kontakt_library_manager/platform/kontakt_platform.dart';
 import 'package:kontakt_library_manager/platform/windows/windows_portable_settings.dart';
 
 class WindowsKontaktPlatform implements KontaktPlatform {
+  static const _hiddenPowerShellArguments = <String>[
+    '-NoLogo',
+    '-NoProfile',
+    '-NonInteractive',
+    '-WindowStyle',
+    'Hidden',
+    '-ExecutionPolicy',
+    'Bypass',
+  ];
+
   WindowsKontaktPlatform({
     ProductHintsParser parser = const ProductHintsParser(),
     LibraryValidator validator = const LibraryValidator(),
     LibraryCandidateScanner candidateScanner = const LibraryCandidateScanner(),
     WindowsPortableSupport? portableSupport,
+    this.serviceCenterPath,
+    this.installedProductsPath,
   }) : _parser = parser,
        _validator = validator,
        _candidateScanner = candidateScanner,
@@ -27,7 +40,11 @@ class WindowsKontaktPlatform implements KontaktPlatform {
   final ProductHintsParser _parser;
   final LibraryValidator _validator;
   final LibraryCandidateScanner _candidateScanner;
+  final ClassicOrderValidator _classicOrderValidator =
+      const ClassicOrderValidator();
   final WindowsPortableSupport portableSupport;
+  final String? serviceCenterPath;
+  final String? installedProductsPath;
 
   bool get _portableMode => portableSupport.enabled;
 
@@ -51,6 +68,7 @@ class WindowsKontaktPlatform implements KontaktPlatform {
     final assembler = InventoryAssembler();
     final diagnostics = <InventoryDiagnostic>[];
     final knownRegKeys = <String>{};
+    final excludedRegKeys = <String>{};
     final programFiles =
         Platform.environment['PROGRAMFILES'] ?? r'C:\Program Files';
     final publicDirectory =
@@ -58,20 +76,24 @@ class WindowsKontaktPlatform implements KontaktPlatform {
 
     await _readXmlDirectory(
       Directory(
-        '$programFiles${Platform.pathSeparator}Common Files${Platform.pathSeparator}Native Instruments${Platform.pathSeparator}Service Center',
+        serviceCenterPath ??
+            '$programFiles${Platform.pathSeparator}Common Files${Platform.pathSeparator}Native Instruments${Platform.pathSeparator}Service Center',
       ),
       assembler,
       knownRegKeys,
+      excludedRegKeys,
     );
     await _readJsonDirectory(
       Directory(
-        '$publicDirectory${Platform.pathSeparator}Documents${Platform.pathSeparator}Native Instruments${Platform.pathSeparator}installed_products',
+        installedProductsPath ??
+            '$publicDirectory${Platform.pathSeparator}Documents${Platform.pathSeparator}Native Instruments${Platform.pathSeparator}installed_products',
       ),
       assembler,
       diagnostics,
       knownRegKeys,
+      excludedRegKeys,
     );
-    await _readRegistry(assembler, diagnostics, knownRegKeys);
+    await _readRegistry(assembler, diagnostics, knownRegKeys, excludedRegKeys);
 
     final libraries = _validator.validate(assembler.build())
       ..sort(
@@ -145,6 +167,7 @@ class WindowsKontaktPlatform implements KontaktPlatform {
     Directory directory,
     InventoryAssembler assembler,
     Set<String> knownRegKeys,
+    Set<String> excludedRegKeys,
   ) async {
     if (!await directory.exists()) return;
     await for (final entity in directory.list(followLinks: false)) {
@@ -153,6 +176,12 @@ class WindowsKontaktPlatform implements KontaktPlatform {
       }
       try {
         final metadata = _parser.parseBytes(await entity.readAsBytes());
+        if (!metadata.isKontaktLibraryMetadata) {
+          excludedRegKeys
+            ..add(metadata.regKey.toLowerCase())
+            ..add(metadata.name.toLowerCase());
+          continue;
+        }
         knownRegKeys.add(metadata.regKey.toLowerCase());
         assembler.add(
           name: metadata.name,
@@ -170,6 +199,7 @@ class WindowsKontaktPlatform implements KontaktPlatform {
     InventoryAssembler assembler,
     List<InventoryDiagnostic> diagnostics,
     Set<String> knownRegKeys,
+    Set<String> excludedRegKeys,
   ) async {
     if (!await directory.exists()) return;
     await for (final entity in directory.list(followLinks: false)) {
@@ -182,13 +212,25 @@ class WindowsKontaktPlatform implements KontaktPlatform {
         final fileName = entity.path.split(Platform.pathSeparator).last;
         final name = fileName.substring(0, fileName.length - 5);
         final regKey = decoded['RegKey'] as String?;
-        knownRegKeys.add((regKey ?? name).toLowerCase());
+        final snpid = decoded['SNPID'] as String?;
+        final contentPath =
+            (decoded['ContentDir'] ?? decoded['contentDir']) as String?;
+        final identity = (regKey ?? name).toLowerCase();
+        if (excludedRegKeys.contains(identity) ||
+            excludedRegKeys.contains(name.toLowerCase())) {
+          continue;
+        }
+        if (!knownRegKeys.contains(identity) &&
+            (snpid?.trim().isEmpty != false ||
+                contentPath?.trim().isEmpty != false)) {
+          continue;
+        }
+        knownRegKeys.add(identity);
         assembler.add(
           name: name,
           regKey: regKey,
-          snpid: decoded['SNPID'] as String?,
-          contentPath:
-              (decoded['ContentDir'] ?? decoded['contentDir']) as String?,
+          snpid: snpid,
+          contentPath: contentPath,
           source: RegistrationSource.installedProducts,
         );
       } catch (error) {
@@ -209,6 +251,7 @@ class WindowsKontaktPlatform implements KontaktPlatform {
     InventoryAssembler assembler,
     List<InventoryDiagnostic> diagnostics,
     Set<String> knownRegKeys,
+    Set<String> excludedRegKeys,
   ) async {
     final helper = _helperFile;
     if (!await helper.exists()) {
@@ -231,11 +274,7 @@ class WindowsKontaktPlatform implements KontaktPlatform {
     );
     try {
       final process = await Process.run('powershell.exe', [
-        '-NoLogo',
-        '-NoProfile',
-        '-NonInteractive',
-        '-ExecutionPolicy',
-        'Bypass',
+        ..._hiddenPowerShellArguments,
         '-File',
         helper.path,
         '-Mode',
@@ -255,10 +294,15 @@ class WindowsKontaktPlatform implements KontaktPlatform {
         final isKnownLibrary =
             regKey != null &&
             knownRegKeys.contains(regKey.trim().toLowerCase());
+        final isExcluded =
+            regKey != null &&
+            excludedRegKeys.contains(regKey.trim().toLowerCase());
         final hasLibraryIdentity =
             snpid?.trim().isNotEmpty == true &&
             contentPath?.trim().isNotEmpty == true;
-        if (regKey == null || (!isKnownLibrary && !hasLibraryIdentity)) {
+        if (regKey == null ||
+            isExcluded ||
+            (!isKnownLibrary && !hasLibraryIdentity)) {
           continue;
         }
         assembler.add(
@@ -302,6 +346,7 @@ class WindowsKontaktPlatform implements KontaktPlatform {
 
   @override
   Future<void> saveClassicLibraryOrder(List<KontaktLibrary> libraries) async {
+    _classicOrderValidator.validate(libraries);
     if (_portableMode) {
       final rootPath = portableSupport.rootPath;
       if (rootPath == null) {
@@ -422,6 +467,25 @@ class WindowsKontaktPlatform implements KontaktPlatform {
   }
 
   @override
+  Future<List<KontaktMutationResult>> removeLibraries(
+    List<KontaktLibrary> libraries,
+  ) async {
+    if (libraries.isEmpty) return const [];
+    if (_portableMode || libraries.length == 1) {
+      final results = <KontaktMutationResult>[];
+      for (final library in libraries) {
+        results.add(await removeLibrary(library));
+      }
+      return results;
+    }
+    return _executeMutations(
+      libraries
+          .map((library) => KontaktMutationRequest.remove(library).payload)
+          .toList(),
+    );
+  }
+
+  @override
   Future<KontaktMutationResult> upsertLibrary(
     KontaktLibraryCandidate candidate,
   ) async {
@@ -442,6 +506,23 @@ class WindowsKontaktPlatform implements KontaktPlatform {
     return _executeMutation(candidate.toUpsertRequest());
   }
 
+  @override
+  Future<List<KontaktMutationResult>> upsertLibraries(
+    List<KontaktLibraryCandidate> candidates,
+  ) async {
+    if (candidates.isEmpty) return const [];
+    if (_portableMode || candidates.length == 1) {
+      final results = <KontaktMutationResult>[];
+      for (final candidate in candidates) {
+        results.add(await upsertLibrary(candidate));
+      }
+      return results;
+    }
+    return _executeMutations(
+      candidates.map((candidate) => candidate.toUpsertRequest()).toList(),
+    );
+  }
+
   File get _helperFile => File(
     '${File(Platform.resolvedExecutable).parent.path}'
     '${Platform.pathSeparator}KontaktLibraryHelper.ps1',
@@ -456,6 +537,17 @@ class WindowsKontaktPlatform implements KontaktPlatform {
       request: request,
     );
     return KontaktMutationResult.fromMap(response);
+  }
+
+  Future<List<KontaktMutationResult>> _executeMutations(
+    List<Map<String, Object>> operations,
+  ) async {
+    final response = await _executeHelperRequest(
+      mode: 'mutation',
+      temporaryDirectoryPrefix: 'klm-mutation-batch-',
+      request: KontaktMutationRequest.batch(operations).payload,
+    );
+    return KontaktMutationResult.listFromMap(response);
   }
 
   Future<Map<String, dynamic>> _executeHelperRequest({
@@ -491,11 +583,7 @@ class WindowsKontaktPlatform implements KontaktPlatform {
       await requestFile.writeAsBytes(requestBytes, flush: true);
       final digest = sha256.convert(requestBytes).toString();
       final process = await Process.run('powershell.exe', [
-        '-NoLogo',
-        '-NoProfile',
-        '-NonInteractive',
-        '-ExecutionPolicy',
-        'Bypass',
+        ..._hiddenPowerShellArguments,
         '-File',
         helper.path,
         '-Mode',

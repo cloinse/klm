@@ -66,6 +66,7 @@ function Invoke-ElevatedMutation {
     '-NoLogo',
     '-NoProfile',
     '-NonInteractive',
+    '-WindowStyle Hidden',
     '-ExecutionPolicy Bypass',
     ('-File ' + (ConvertTo-NativeQuotedArgument $HelperPath)),
     '-Mode mutation',
@@ -76,7 +77,7 @@ function Invoke-ElevatedMutation {
 
   try {
     $elevated = Start-Process -FilePath 'powershell.exe' -Verb RunAs `
-      -ArgumentList $argumentLine -Wait -PassThru
+      -ArgumentList $argumentLine -WindowStyle Hidden -Wait -PassThru
   } catch {
     Write-JsonFile $Response ([ordered]@{
       errorCode = 'authorization_cancelled'
@@ -697,14 +698,15 @@ function Set-UserRegistryValues {
   }
 }
 
-function Invoke-Mutation {
-  $request = Get-VerifiedRequest 'mutation'
-  $operation = [string](Get-ObjectProperty $request 'operation')
+function New-MutationPlan {
+  param([Parameter(Mandatory = $true)] $Request)
+
+  $operation = [string](Get-ObjectProperty $Request 'operation')
   if ($operation -notin @('upsert', 'relocate', 'remove')) {
     throw 'Unknown mutation operation.'
   }
-  $name = Get-SafeComponent (Get-ObjectProperty $request 'name') 'name'
-  $regKey = Get-SafeComponent (Get-ObjectProperty $request 'regKey') 'RegKey'
+  $name = Get-SafeComponent (Get-ObjectProperty $Request 'name') 'name'
+  $regKey = Get-SafeComponent (Get-ObjectProperty $Request 'regKey') 'RegKey'
 
   $programFiles = [System.Environment]::GetFolderPath(
     [System.Environment+SpecialFolder]::ProgramFiles
@@ -721,12 +723,12 @@ function Invoke-Mutation {
   $registryValues = @{}
   $removeRegistry = $operation -eq 'remove'
   if ($operation -eq 'upsert') {
-    $snpid = Get-SafeComponent (Get-ObjectProperty $request 'snpid') 'SNPID'
-    $contentPath = Get-ContentDirectory (Get-ObjectProperty $request 'contentPath')
-    $productHintsXml = [string](Get-ObjectProperty $request 'productHintsXml')
+    $snpid = Get-SafeComponent (Get-ObjectProperty $Request 'snpid') 'SNPID'
+    $contentPath = Get-ContentDirectory (Get-ObjectProperty $Request 'contentPath')
+    $productHintsXml = [string](Get-ObjectProperty $Request 'productHintsXml')
     Assert-ProductHints $productHintsXml $name $regKey $snpid
     $visibility = 3
-    $requestedVisibility = Get-ObjectProperty $request 'visibility'
+    $requestedVisibility = Get-ObjectProperty $Request 'visibility'
     if ($null -ne $requestedVisibility) { $visibility = [int]$requestedVisibility }
     if ($visibility -lt 0 -or $visibility -gt 255) { throw 'Invalid visibility.' }
 
@@ -742,7 +744,7 @@ function Invoke-Mutation {
       @('authSystem', 'AuthSystem')
     )) {
       $value = Get-OptionalSafeString (
-        Get-ObjectProperty $request $pair[0]
+        Get-ObjectProperty $Request $pair[0]
       ) $pair[0]
       if ($null -ne $value) { $registryValues[$pair[1]] = $value }
     }
@@ -752,14 +754,14 @@ function Invoke-Mutation {
       [pscustomobject]@{ Path = $jsonPath; Contents = $json }
     )
   } elseif ($operation -eq 'relocate') {
-    $contentPath = Get-ContentDirectory (Get-ObjectProperty $request 'contentPath')
+    $contentPath = Get-ContentDirectory (Get-ObjectProperty $Request 'contentPath')
     $registryValues = @{
       Name = $name
       RegKey = $regKey
       ContentDir = $contentPath
     }
     $snpid = Get-OptionalSafeString (
-      Get-ObjectProperty $request 'snpid'
+      Get-ObjectProperty $Request 'snpid'
     ) 'SNPID'
     if ($null -ne $snpid) { $registryValues.SNPID = $snpid }
     $json = ConvertTo-Json -InputObject ([ordered]@{ ContentDir = $contentPath }) -Depth 3
@@ -779,58 +781,127 @@ function Invoke-Mutation {
     ([Microsoft.Win32.RegistryView]::Registry32) `
     $regKey
   if ($registry32.Exists) { $views += [Microsoft.Win32.RegistryView]::Registry32 }
-  $fileBackups = @{}
-  $registryBackups = @{}
-  $changedPaths = New-Object System.Collections.Generic.List[string]
-  try {
-    foreach ($change in $fileChanges) {
-      Assert-NoReparsePoint (Split-Path -Parent $change.Path)
-      $fileBackups[$change.Path] = Get-FileBackup $change.Path
-      if ($null -eq $change.Contents) {
-        if (Test-Path -LiteralPath $change.Path -PathType Leaf) {
-          Remove-Item -LiteralPath $change.Path -Force
+
+  return [pscustomobject]@{
+    Operation = $operation
+    Name = $name
+    RegKey = $regKey
+    FileChanges = $fileChanges
+    RegistryValues = $registryValues
+    RemoveRegistry = $removeRegistry
+    Views = $views
+    Registry32Backup = $registry32
+  }
+}
+
+function Invoke-Mutation {
+  $request = Get-VerifiedRequest 'mutation'
+  $rawOperations = Get-ObjectProperty $request 'operations'
+  $requests = if ($null -eq $rawOperations) { @($request) } else { @($rawOperations) }
+  if ($requests.Count -lt 1 -or $requests.Count -gt 1000) {
+    throw 'Invalid mutation batch size.'
+  }
+
+  $plans = New-Object System.Collections.Generic.List[object]
+  $targets = @{}
+  foreach ($operationRequest in $requests) {
+    $plan = New-MutationPlan $operationRequest
+    foreach ($change in $plan.FileChanges) {
+      $target = 'file|' + $change.Path.ToLowerInvariant()
+      if ($targets.ContainsKey($target)) {
+        if ($null -ne $change.Contents -or $targets[$target] -ne 'remove') {
+          throw 'Conflicting mutation targets.'
         }
       } else {
-        Set-AtomicUtf8File $change.Path $change.Contents
+        $targets[$target] = if ($null -eq $change.Contents) { 'remove' } else { 'write' }
       }
-      $changedPaths.Add($change.Path) | Out-Null
     }
-
-    foreach ($view in $views) {
-      $key = "$view"
-      $registryBackups[$key] = if ($view -eq [Microsoft.Win32.RegistryView]::Registry32) {
-        $registry32
+    foreach ($view in $plan.Views) {
+      $target = "registry|$view|$($plan.RegKey.ToLowerInvariant())"
+      if ($targets.ContainsKey($target)) {
+        if (-not $plan.RemoveRegistry -or $targets[$target] -ne 'remove') {
+          throw 'Conflicting mutation targets.'
+        }
       } else {
-        Get-RegistryBackup ([Microsoft.Win32.RegistryHive]::LocalMachine) $view $regKey
+        $targets[$target] = if ($plan.RemoveRegistry) { 'remove' } else { 'write' }
       }
-      Set-RegistryRecord $view $regKey $registryValues $removeRegistry
-      $changedPaths.Add(
-        "HKLM [$view]\SOFTWARE\Native Instruments\$regKey"
-      ) | Out-Null
+    }
+    $plans.Add($plan) | Out-Null
+  }
+
+  $fileBackups = @{}
+  $registryBackups = @{}
+  $appliedFileTargets = @{}
+  $appliedRegistryTargets = @{}
+  $results = New-Object System.Collections.Generic.List[object]
+  try {
+    foreach ($plan in $plans) {
+      $changedPaths = New-Object System.Collections.Generic.List[string]
+      foreach ($change in $plan.FileChanges) {
+        $fileTarget = $change.Path.ToLowerInvariant()
+        if (-not $appliedFileTargets.ContainsKey($fileTarget)) {
+          Assert-NoReparsePoint (Split-Path -Parent $change.Path)
+          $fileBackups[$change.Path] = Get-FileBackup $change.Path
+          if ($null -eq $change.Contents) {
+            if (Test-Path -LiteralPath $change.Path -PathType Leaf) {
+              Remove-Item -LiteralPath $change.Path -Force
+            }
+          } else {
+            Set-AtomicUtf8File $change.Path $change.Contents
+          }
+          $appliedFileTargets[$fileTarget] = $true
+        }
+        $changedPaths.Add($change.Path) | Out-Null
+      }
+
+      foreach ($view in $plan.Views) {
+        $key = "$view|$($plan.RegKey)"
+        $registryTarget = $key.ToLowerInvariant()
+        if (-not $appliedRegistryTargets.ContainsKey($registryTarget)) {
+          $backup = if ($view -eq [Microsoft.Win32.RegistryView]::Registry32) {
+            $plan.Registry32Backup
+          } else {
+            Get-RegistryBackup `
+              ([Microsoft.Win32.RegistryHive]::LocalMachine) $view $plan.RegKey
+          }
+          $registryBackups[$key] = [pscustomobject]@{
+            View = $view
+            RegKey = $plan.RegKey
+            Backup = $backup
+          }
+          Set-RegistryRecord `
+            $view $plan.RegKey $plan.RegistryValues $plan.RemoveRegistry
+          $appliedRegistryTargets[$registryTarget] = $true
+        }
+        $changedPaths.Add(
+          "HKLM [$view]\SOFTWARE\Native Instruments\$($plan.RegKey)"
+        ) | Out-Null
+      }
+
+      $results.Add([ordered]@{
+        operation = $plan.Operation
+        libraryName = $plan.Name
+        changedPaths = $changedPaths.ToArray()
+      }) | Out-Null
     }
   } catch {
-    foreach ($change in $fileChanges) {
-      if ($fileBackups.ContainsKey($change.Path)) {
-        try { Restore-FileBackup $change.Path $fileBackups[$change.Path] } catch {}
-      }
+    foreach ($entry in $fileBackups.GetEnumerator()) {
+      try { Restore-FileBackup $entry.Key $entry.Value } catch {}
     }
-    foreach ($view in $views) {
-      $key = "$view"
-      if ($registryBackups.ContainsKey($key)) {
-        try {
-          Restore-RegistryBackup `
-            ([Microsoft.Win32.RegistryHive]::LocalMachine) `
-            $view $regKey $registryBackups[$key]
-        } catch {}
-      }
+    foreach ($entry in $registryBackups.Values) {
+      try {
+        Restore-RegistryBackup `
+          ([Microsoft.Win32.RegistryHive]::LocalMachine) `
+          $entry.View $entry.RegKey $entry.Backup
+      } catch {}
     }
     throw
   }
 
+  if ($null -eq $rawOperations) { return $results[0] }
   return [ordered]@{
-    operation = $operation
-    libraryName = $name
-    changedPaths = $changedPaths.ToArray()
+    operation = 'batch'
+    results = $results.ToArray()
   }
 }
 

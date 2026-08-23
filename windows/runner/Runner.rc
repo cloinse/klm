@@ -91,11 +91,11 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.juanayala" "\0"
+            VALUE "CompanyName", "cloin.se" "\0"
             VALUE "FileDescription", "kontakt_library_manager" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "kontakt_library_manager" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.juanayala. All rights reserved." "\0"
+            VALUE "LegalCopyright", "KLM v" VERSION_AS_STRING " cloin.se\0"
             VALUE "OriginalFilename", "kontakt_library_manager.exe" "\0"
             VALUE "ProductName", "kontakt_library_manager" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"

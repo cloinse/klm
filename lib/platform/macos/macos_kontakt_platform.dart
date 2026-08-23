@@ -6,6 +6,7 @@ import 'package:kontakt_library_manager/core/metadata/product_hints_parser.dart'
 import 'package:kontakt_library_manager/core/models/kontakt_library.dart';
 import 'package:kontakt_library_manager/core/models/kontakt_mutation.dart';
 import 'package:kontakt_library_manager/core/validation/library_validator.dart';
+import 'package:kontakt_library_manager/core/validation/classic_order_validator.dart';
 import 'package:kontakt_library_manager/features/mutations/library_candidate_scanner.dart';
 import 'package:kontakt_library_manager/platform/inventory_assembler.dart';
 import 'package:kontakt_library_manager/platform/kontakt_platform.dart';
@@ -31,6 +32,8 @@ class MacOSKontaktPlatform implements KontaktPlatform {
   final ProductHintsParser _parser;
   final LibraryValidator _validator;
   final LibraryCandidateScanner _candidateScanner;
+  final ClassicOrderValidator _classicOrderValidator =
+      const ClassicOrderValidator();
   final String serviceCenterPath;
   final String preferencesPath;
   final String userPreferencesPath;
@@ -49,10 +52,27 @@ class MacOSKontaktPlatform implements KontaktPlatform {
   Future<InventorySnapshot> scanLibraries() async {
     final assembler = InventoryAssembler();
     final diagnostics = <InventoryDiagnostic>[];
+    final knownRegKeys = <String>{};
+    final excludedRegKeys = <String>{};
 
-    await _readServiceCenter(assembler, diagnostics);
-    await _readInstalledProducts(assembler, diagnostics);
-    await _readPreferences(assembler, diagnostics);
+    await _readServiceCenter(
+      assembler,
+      diagnostics,
+      knownRegKeys,
+      excludedRegKeys,
+    );
+    await _readPreferences(
+      assembler,
+      diagnostics,
+      knownRegKeys,
+      excludedRegKeys,
+    );
+    await _readInstalledProducts(
+      assembler,
+      diagnostics,
+      knownRegKeys,
+      excludedRegKeys,
+    );
     await _readUserListIndexes(assembler);
 
     final libraries = _validator.validate(assembler.build())
@@ -70,6 +90,8 @@ class MacOSKontaktPlatform implements KontaktPlatform {
   Future<void> _readServiceCenter(
     InventoryAssembler assembler,
     List<InventoryDiagnostic> diagnostics,
+    Set<String> knownRegKeys,
+    Set<String> excludedRegKeys,
   ) async {
     final directory = Directory(serviceCenterPath);
     if (!await directory.exists()) {
@@ -90,6 +112,13 @@ class MacOSKontaktPlatform implements KontaktPlatform {
       }
       try {
         final metadata = _parser.parseBytes(await entity.readAsBytes());
+        if (!metadata.isKontaktLibraryMetadata) {
+          excludedRegKeys
+            ..add(metadata.regKey.toLowerCase())
+            ..add(metadata.name.toLowerCase());
+          continue;
+        }
+        knownRegKeys.add(metadata.regKey.toLowerCase());
         assembler.add(
           name: metadata.name,
           regKey: metadata.regKey,
@@ -107,6 +136,8 @@ class MacOSKontaktPlatform implements KontaktPlatform {
   Future<void> _readInstalledProducts(
     InventoryAssembler assembler,
     List<InventoryDiagnostic> diagnostics,
+    Set<String> knownRegKeys,
+    Set<String> excludedRegKeys,
   ) async {
     final directory = Directory(installedProductsPath);
     if (!await directory.exists()) {
@@ -128,15 +159,29 @@ class MacOSKontaktPlatform implements KontaktPlatform {
       try {
         final object = jsonDecode(await entity.readAsString());
         if (object is! Map<String, dynamic>) continue;
+        final name = _stem(entity.path);
+        final regKey = _stringValue(object, const ['RegKey', 'regKey']);
+        final snpid = _stringValue(object, const ['SNPID', 'snpid']);
+        final contentPath = _stringValue(object, const [
+          'ContentDir',
+          'contentDir',
+          'content_path',
+        ]);
+        final identity = (regKey ?? name).toLowerCase();
+        if (excludedRegKeys.contains(identity) ||
+            excludedRegKeys.contains(name.toLowerCase())) {
+          continue;
+        }
+        if (!knownRegKeys.contains(identity) &&
+            (snpid == null || contentPath == null)) {
+          continue;
+        }
+        knownRegKeys.add(identity);
         assembler.add(
-          name: _stem(entity.path),
-          regKey: _stringValue(object, const ['RegKey', 'regKey']),
-          snpid: _stringValue(object, const ['SNPID', 'snpid']),
-          contentPath: _stringValue(object, const [
-            'ContentDir',
-            'contentDir',
-            'content_path',
-          ]),
+          name: name,
+          regKey: regKey,
+          snpid: snpid,
+          contentPath: contentPath,
           source: RegistrationSource.installedProducts,
         );
       } catch (error) {
@@ -156,6 +201,8 @@ class MacOSKontaktPlatform implements KontaktPlatform {
   Future<void> _readPreferences(
     InventoryAssembler assembler,
     List<InventoryDiagnostic> diagnostics,
+    Set<String> knownRegKeys,
+    Set<String> excludedRegKeys,
   ) async {
     final directory = Directory(preferencesPath);
     if (!await directory.exists()) return;
@@ -182,12 +229,32 @@ class MacOSKontaktPlatform implements KontaktPlatform {
         final name = _stringValue(object, const ['Name', 'name']);
         final snpid = _stringValue(object, const ['SNPID', 'snpid']);
         if (name == null || snpid == null) continue;
+        final regKey = _stringValue(object, const ['RegKey', 'regKey']);
+        final contentPath = _stringValue(object, const [
+          'ContentDir',
+          'contentDir',
+        ]);
+        final visibility = _intValue(object, const [
+          'Visibility',
+          'visibility',
+        ]);
+        final identity = (regKey ?? name).toLowerCase();
+        if (excludedRegKeys.contains(identity) ||
+            excludedRegKeys.contains(name.toLowerCase())) {
+          continue;
+        }
+        if (!knownRegKeys.contains(identity) &&
+            contentPath == null &&
+            visibility == null) {
+          continue;
+        }
+        knownRegKeys.add(identity);
         assembler.add(
           name: name,
-          regKey: _stringValue(object, const ['RegKey', 'regKey']),
+          regKey: regKey,
           snpid: snpid,
-          contentPath: _stringValue(object, const ['ContentDir', 'contentDir']),
-          visibility: _intValue(object, const ['Visibility', 'visibility']),
+          contentPath: contentPath,
+          visibility: visibility,
           source: RegistrationSource.preferences,
         );
       } catch (_) {
@@ -275,6 +342,7 @@ class MacOSKontaktPlatform implements KontaktPlatform {
 
   @override
   Future<void> saveClassicLibraryOrder(List<KontaktLibrary> libraries) async {
+    _classicOrderValidator.validate(libraries);
     final entries = <Map<String, Object>>[];
     for (var index = 0; index < libraries.length; index++) {
       final library = libraries[index];
@@ -342,6 +410,19 @@ class MacOSKontaktPlatform implements KontaktPlatform {
   }
 
   @override
+  Future<List<KontaktMutationResult>> upsertLibraries(
+    List<KontaktLibraryCandidate> candidates,
+  ) {
+    if (candidates.isEmpty) return Future.value(const []);
+    if (candidates.length == 1) {
+      return upsertLibrary(candidates.single).then((result) => [result]);
+    }
+    return _executeMutations(
+      candidates.map((candidate) => candidate.toUpsertRequest()).toList(),
+    );
+  }
+
+  @override
   Future<KontaktMutationResult> relocateLibrary(
     KontaktLibrary library,
     String contentPath,
@@ -367,6 +448,33 @@ class MacOSKontaktPlatform implements KontaktPlatform {
     return result;
   }
 
+  @override
+  Future<List<KontaktMutationResult>> removeLibraries(
+    List<KontaktLibrary> libraries,
+  ) async {
+    if (libraries.isEmpty) return const [];
+    if (libraries.length == 1) return [await removeLibrary(libraries.single)];
+    final results = await _executeMutations(
+      libraries
+          .map((library) => KontaktMutationRequest.remove(library).payload)
+          .toList(),
+    );
+    for (final library in libraries) {
+      await _removeUserOrderPreference(library);
+    }
+    return results;
+  }
+
+  Future<void> _removeUserOrderPreference(KontaktLibrary library) async {
+    final regKey = library.regKey;
+    final home = Platform.environment['HOME'];
+    if (regKey == null || home == null || !_isSafeComponent(regKey)) return;
+    final userPlist = File(
+      '$home/Library/Preferences/com.native-instruments.$regKey.plist',
+    );
+    if (await userPlist.exists()) await userPlist.delete();
+  }
+
   Future<KontaktMutationResult> _executeMutation(
     Map<String, Object> request,
   ) async {
@@ -381,6 +489,22 @@ class MacOSKontaktPlatform implements KontaktPlatform {
       );
     }
     return KontaktMutationResult.fromMap(response);
+  }
+
+  Future<List<KontaktMutationResult>> _executeMutations(
+    List<Map<String, Object>> operations,
+  ) async {
+    final response = await _systemChannel.invokeMapMethod<Object?, Object?>(
+      'executeMutation',
+      KontaktMutationRequest.batch(operations).payload,
+    );
+    if (response == null) {
+      throw PlatformException(
+        code: 'empty_helper_response',
+        message: 'The privileged helper returned no response.',
+      );
+    }
+    return KontaktMutationResult.listFromMap(response);
   }
 
   PrivilegedHelperStatus _helperStatus(String? value) => switch (value) {

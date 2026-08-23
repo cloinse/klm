@@ -33,4 +33,37 @@ void main() {
     expect(payload, isNot(contains('target')));
     expect(payload, isNot(contains('paths')));
   });
+
+  test('batch request wraps multiple validated operations', () {
+    final remove = KontaktMutationRequest.remove(library).payload;
+    final payload = KontaktMutationRequest.batch([remove, remove]).payload;
+
+    expect(payload['version'], 1);
+    expect(payload, isNot(contains('operation')));
+    expect(payload['operations'], hasLength(2));
+  });
+
+  test('batch response returns every mutation result', () {
+    final results = KontaktMutationResult.listFromMap({
+      'operation': 'batch',
+      'results': [
+        {
+          'operation': 'remove',
+          'libraryName': 'Alpha',
+          'changedPaths': ['/alpha.xml'],
+        },
+        {
+          'operation': 'remove',
+          'libraryName': 'Beta',
+          'changedPaths': ['/beta.xml'],
+        },
+      ],
+    });
+
+    expect(results.map((result) => result.libraryName), ['Alpha', 'Beta']);
+    expect(
+      results.every((result) => result.operation == KontaktMutationType.remove),
+      isTrue,
+    );
+  });
 }

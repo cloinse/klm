@@ -25,6 +25,27 @@ class OperationLog {
   final int? count;
 }
 
+class LibraryRepairMatch {
+  const LibraryRepairMatch({required this.library, required this.candidate});
+
+  final KontaktLibrary library;
+  final KontaktLibraryCandidate candidate;
+}
+
+class LibraryRepairPreview {
+  const LibraryRepairPreview({
+    required this.matches,
+    required this.unmatchedLibraries,
+    required this.ambiguousLibraries,
+    required this.unmatchedCandidates,
+  });
+
+  final List<LibraryRepairMatch> matches;
+  final List<KontaktLibrary> unmatchedLibraries;
+  final List<KontaktLibrary> ambiguousLibraries;
+  final List<KontaktLibraryCandidate> unmatchedCandidates;
+}
+
 class LibraryInventoryController extends ChangeNotifier {
   LibraryInventoryController(this.platform) {
     if (!platform.capabilities.canManageClassicOrder) {
@@ -43,6 +64,7 @@ class LibraryInventoryController extends ChangeNotifier {
   PrivilegedHelperStatus helperStatus = PrivilegedHelperStatus.unavailable;
   bool mutationInProgress = false;
   bool orderSaveInProgress = false;
+  Object? _classicOrderWarning;
   bool _refreshQueued = false;
   bool _customOrderInitialized = false;
   final List<String> _customLibraryIds = <String>[];
@@ -114,6 +136,11 @@ class LibraryInventoryController extends ChangeNotifier {
       if (_selectedLibraryIds.contains(library.id)) library,
   ];
 
+  List<KontaktLibrary> get selectedLibrariesNeedingRepair => [
+    for (final library in selectedLibraries)
+      if (library.health != LibraryHealth.healthy) library,
+  ];
+
   bool get allVisibleLibrariesSelected =>
       visibleLibraries.isNotEmpty &&
       visibleLibraries.every((library) => isLibrarySelected(library.id));
@@ -142,6 +169,12 @@ class LibraryInventoryController extends ChangeNotifier {
     if (_selectedLibraryIds.isEmpty) return;
     _selectedLibraryIds.clear();
     notifyListeners();
+  }
+
+  Object? consumeClassicOrderWarning() {
+    final warning = _classicOrderWarning;
+    _classicOrderWarning = null;
+    return warning;
   }
 
   bool get hasUnsavedCustomOrder =>
@@ -293,9 +326,86 @@ class LibraryInventoryController extends ChangeNotifier {
   ) {
     final candidateKey = candidate.metadata.regKey.trim().toLowerCase();
     final libraryKey = (library.regKey ?? library.name).trim().toLowerCase();
+    final candidateSnpid = candidate.metadata.snpid.trim().toLowerCase();
+    final librarySnpid = library.snpid?.trim().toLowerCase();
     return candidateKey == libraryKey ||
+        (librarySnpid != null &&
+            librarySnpid.isNotEmpty &&
+            candidateSnpid == librarySnpid) ||
         candidate.metadata.name.trim().toLowerCase() ==
             library.name.trim().toLowerCase();
+  }
+
+  LibraryRepairPreview previewRepairs(
+    List<KontaktLibrary> libraries,
+    List<KontaktLibraryCandidate> candidates,
+  ) {
+    final matches = <LibraryRepairMatch>[];
+    final unmatched = <KontaktLibrary>[];
+    final ambiguous = <KontaktLibrary>[];
+    final usedCandidates = <KontaktLibraryCandidate>{};
+
+    for (final library in libraries) {
+      final available = candidates
+          .where((candidate) => !usedCandidates.contains(candidate))
+          .toList(growable: false);
+      final candidateMatches = _bestRepairCandidates(library, available);
+      if (candidateMatches.isEmpty) {
+        unmatched.add(library);
+      } else if (candidateMatches.length > 1) {
+        ambiguous.add(library);
+      } else {
+        final candidate = candidateMatches.single;
+        usedCandidates.add(candidate);
+        matches.add(LibraryRepairMatch(library: library, candidate: candidate));
+      }
+    }
+
+    return LibraryRepairPreview(
+      matches: List.unmodifiable(matches),
+      unmatchedLibraries: List.unmodifiable(unmatched),
+      ambiguousLibraries: List.unmodifiable(ambiguous),
+      unmatchedCandidates: List.unmodifiable(
+        candidates.where((candidate) => !usedCandidates.contains(candidate)),
+      ),
+    );
+  }
+
+  List<KontaktLibraryCandidate> _bestRepairCandidates(
+    KontaktLibrary library,
+    List<KontaktLibraryCandidate> candidates,
+  ) {
+    final libraryKey = (library.regKey ?? '').trim().toLowerCase();
+    final byRegKey = libraryKey.isEmpty
+        ? const <KontaktLibraryCandidate>[]
+        : candidates
+              .where(
+                (candidate) =>
+                    candidate.metadata.regKey.trim().toLowerCase() ==
+                    libraryKey,
+              )
+              .toList(growable: false);
+    if (byRegKey.isNotEmpty) return byRegKey;
+
+    final librarySnpid = (library.snpid ?? '').trim().toLowerCase();
+    final bySnpid = librarySnpid.isEmpty
+        ? const <KontaktLibraryCandidate>[]
+        : candidates
+              .where(
+                (candidate) =>
+                    candidate.metadata.snpid.trim().toLowerCase() ==
+                    librarySnpid,
+              )
+              .toList(growable: false);
+    if (bySnpid.isNotEmpty) return bySnpid;
+
+    final libraryName = library.name.trim().toLowerCase();
+    return candidates
+        .where(
+          (candidate) =>
+              candidate.metadata.name.trim().toLowerCase() == libraryName,
+        )
+        .toList(growable: false);
   }
 
   Future<void> upsertCandidates(
@@ -314,8 +424,8 @@ class LibraryInventoryController extends ChangeNotifier {
     }
     await _runMutation(() async {
       await _ensureHelperEnabled();
+      await platform.upsertLibraries(candidates);
       for (final candidate in candidates) {
-        await platform.upsertLibrary(candidate);
         _log(
           repair ? 'library_repaired' : 'library_added',
           candidate.metadata.name,
@@ -341,6 +451,7 @@ class LibraryInventoryController extends ChangeNotifier {
 
   Future<void> removeLibraries(Iterable<KontaktLibrary> values) async {
     if (mutationInProgress) return;
+    _classicOrderWarning = null;
     final libraries = <KontaktLibrary>[];
     final seenIds = <String>{};
     for (final library in values) {
@@ -355,8 +466,8 @@ class LibraryInventoryController extends ChangeNotifier {
     try {
       await _runMutation(() async {
         await _ensureHelperEnabled();
+        await platform.removeLibraries(libraries);
         for (final library in libraries) {
-          await platform.removeLibrary(library);
           _log('library_removed', library.name);
         }
       });
@@ -373,7 +484,13 @@ class LibraryInventoryController extends ChangeNotifier {
         ..._savedCustomLibraryIds.where((id) => !removedIds.contains(id)),
         ...removedIds,
       ]);
-      await saveCustomOrder();
+      try {
+        await saveCustomOrder();
+      } catch (error) {
+        _classicOrderWarning = error;
+        _log('classic_order_error', error.toString(), isError: true);
+        notifyListeners();
+      }
     }
   }
 

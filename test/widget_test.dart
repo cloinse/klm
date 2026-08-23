@@ -1,3 +1,5 @@
+import 'package:flutter/gestures.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kontakt_library_manager/app/kontakt_library_manager_app.dart';
@@ -32,7 +34,12 @@ void main() {
     expect(find.byTooltip('SNPID: ABC'), findsOneWidget);
     expect(find.text('K6'), findsNothing);
     expect(find.text('K7/8'), findsNothing);
-    expect(find.text('Reload'), findsOneWidget);
+    expect(find.text('Reload'), findsNothing);
+    expect(find.byTooltip('Reload'), findsOneWidget);
+    expect(
+      tester.widget(find.byKey(const ValueKey('reload-libraries-button'))),
+      isA<OutlinedButton>(),
+    );
   });
 
   testWidgets('changes the interface language from Settings', (tester) async {
@@ -53,6 +60,7 @@ void main() {
 
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
+    expect(find.text('Check now'), findsOneWidget);
     await tester.tap(find.text('English'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Español').last);
@@ -60,6 +68,7 @@ void main() {
 
     expect(find.text('Ajustes'), findsNWidgets(2));
     expect(find.text('Idioma de la interfaz'), findsOneWidget);
+    expect(find.text('Comprobar ahora'), findsOneWidget);
     expect(const AppLocalizations(Locale('es')).refresh, 'Recargar');
     expect(localeController.language, AppLanguage.spanish);
 
@@ -72,7 +81,12 @@ void main() {
 
     expect(find.text('Configurações'), findsNWidgets(2));
     expect(find.text('Idioma da interface'), findsOneWidget);
+    expect(find.text('Verificar agora'), findsOneWidget);
     expect(const AppLocalizations(Locale('pt', 'BR')).refresh, 'Recarregar');
+    expect(
+      const AppLocalizations(Locale('zh', 'CN')).tr('checkForUpdates'),
+      '立即检查',
+    );
     expect(localeController.language, AppLanguage.portugueseBrazil);
   });
 
@@ -176,7 +190,7 @@ void main() {
 
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Check for updates'));
+    await tester.tap(find.text('Check now'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
@@ -227,7 +241,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('KLM v1.0.0 - Juan Ayala'), findsOneWidget);
+    expect(find.text('KLM v1.0.0 cloin.se'), findsOneWidget);
 
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
@@ -243,7 +257,7 @@ void main() {
     expect(find.text('Application updates'), findsOneWidget);
     expect(find.textContaining('Version 1.0.0'), findsOneWidget);
 
-    await tester.tap(find.text('Check for updates'));
+    await tester.tap(find.text('Check now'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     expect(updatePlatform.probeCount, 2);
@@ -373,7 +387,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byIcon(Icons.drag_indicator_rounded), findsNWidgets(3));
-    expect(find.text('Save changes'), findsNothing);
+    expect(find.text('Save'), findsNothing);
 
     await tester.drag(
       find.byIcon(Icons.drag_indicator_rounded).first,
@@ -381,11 +395,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Save changes'), findsOneWidget);
-    await tester.tap(find.text('Save changes'));
+    expect(find.text('Save'), findsOneWidget);
+    await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
     expect(platform.savedOrder, isNotNull);
-    expect(find.text('Save changes'), findsNothing);
+    expect(find.text('Save'), findsNothing);
   });
 
   testWidgets('library rows keep the same height when filtering', (
@@ -513,7 +527,11 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('select-library-beta')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Remove selected (2)'), findsOneWidget);
+    expect(find.text('Remove'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('repair-selected-libraries')),
+      findsNothing,
+    );
     await tester.tap(find.byKey(const ValueKey('remove-selected-libraries')));
     await tester.pumpAndSettle();
     expect(find.text('Remove 2 library records?'), findsOneWidget);
@@ -528,6 +546,257 @@ void main() {
       find.byKey(const ValueKey('remove-selected-libraries')),
       findsNothing,
     );
+  });
+
+  testWidgets('previews and repairs multiple selected libraries in one batch', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    try {
+      tester.view.physicalSize = const Size(1400, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final themeController = ThemeController();
+      await themeController.setPreference(AppThemePreference.dark);
+      addTearDown(themeController.dispose);
+      final platform = _FakePlatform(
+        libraries: [
+          const KontaktLibrary(
+            id: 'alpha',
+            name: 'Alpha',
+            regKey: 'Alpha',
+            snpid: 'A01',
+            issues: [
+              LibraryIssue(
+                code: 'missing_registration',
+                message: 'Missing registration',
+                severity: IssueSeverity.warning,
+              ),
+            ],
+          ),
+          const KontaktLibrary(
+            id: 'beta',
+            name: 'Beta',
+            regKey: 'Beta',
+            snpid: 'B01',
+            issues: [
+              LibraryIssue(
+                code: 'content_offline',
+                message: 'Content is offline',
+                severity: IssueSeverity.error,
+              ),
+            ],
+          ),
+          const KontaktLibrary(
+            id: 'gamma',
+            name: 'Gamma',
+            regKey: 'Gamma',
+            snpid: 'G01',
+          ),
+        ],
+        candidates: [
+          _widgetCandidate('Alpha', 'A01'),
+          _widgetCandidate('Beta', 'B01'),
+        ],
+      );
+
+      await tester.pumpWidget(
+        KontaktLibraryManagerApp(
+          platform: platform,
+          themeController: themeController,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('select-library-alpha')));
+      await tester.tap(find.byKey(const ValueKey('select-library-beta')));
+      await tester.tap(find.byKey(const ValueKey('select-library-gamma')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Repair'), findsOneWidget);
+      final repairCenter = tester.getCenter(
+        find.byKey(const ValueKey('repair-selected-libraries')),
+      );
+      final reloadRect = tester.getRect(
+        find.byKey(const ValueKey('reload-libraries-button')),
+      );
+      final repairRect = tester.getRect(
+        find.byKey(const ValueKey('repair-selected-libraries')),
+      );
+      final removeRect = tester.getRect(
+        find.byKey(const ValueKey('remove-selected-libraries')),
+      );
+      final addRect = tester.getRect(
+        find.byKey(const ValueKey('add-library-button')),
+      );
+      final reloadCenter = tester.getCenter(
+        find.byKey(const ValueKey('reload-libraries-button')),
+      );
+      final addCenter = tester.getCenter(
+        find.byKey(const ValueKey('add-library-button')),
+      );
+      final addMenuCenter = tester.getCenter(
+        find.byTooltip('Add multiple libraries'),
+      );
+      final reloadSize = tester.getSize(
+        find.byKey(const ValueKey('reload-libraries-button')),
+      );
+      final repairSize = tester.getSize(
+        find.byKey(const ValueKey('repair-selected-libraries')),
+      );
+      final removeSize = tester.getSize(
+        find.byKey(const ValueKey('remove-selected-libraries')),
+      );
+      final addSize = tester.getSize(
+        find.byKey(const ValueKey('add-library-button')),
+      );
+      final addMenuSize = tester.getSize(
+        find.byKey(const ValueKey('add-multiple-libraries-button')),
+      );
+      final reloadButton = tester.widget<OutlinedButton>(
+        find.byKey(const ValueKey('reload-libraries-button')),
+      );
+      final repairButton = tester.widget<OutlinedButton>(
+        find.byKey(const ValueKey('repair-selected-libraries')),
+      );
+      final addMenuButton = tester.widget<TextButton>(
+        find.byKey(const ValueKey('add-multiple-libraries-button')),
+      );
+      final reloadVisualSize = tester.getSize(
+        find
+            .descendant(
+              of: find.byKey(const ValueKey('reload-libraries-button')),
+              matching: find.byType(Material),
+            )
+            .first,
+      );
+      final repairVisualSize = tester.getSize(
+        find
+            .descendant(
+              of: find.byKey(const ValueKey('repair-selected-libraries')),
+              matching: find.byType(Material),
+            )
+            .first,
+      );
+      final removeVisualSize = tester.getSize(
+        find
+            .descendant(
+              of: find.byKey(const ValueKey('remove-selected-libraries')),
+              matching: find.byType(Material),
+            )
+            .first,
+      );
+      final addVisualSize = tester.getSize(
+        find
+            .descendant(
+              of: find.byKey(const ValueKey('add-library-button')),
+              matching: find.byType(Material),
+            )
+            .first,
+      );
+      final addMenuVisualSize = tester.getSize(
+        find
+            .descendant(
+              of: find.byKey(const ValueKey('add-multiple-libraries-button')),
+              matching: find.byType(Material),
+            )
+            .first,
+      );
+      expect(repairCenter.dx, greaterThan(tester.view.physicalSize.width / 2));
+      expect(reloadCenter.dx, lessThan(repairCenter.dx));
+      expect(reloadCenter.dx, lessThan(addCenter.dx));
+      expect((repairCenter.dy - addCenter.dy).abs(), lessThan(1));
+      expect((repairCenter.dy - addMenuCenter.dy).abs(), lessThan(1));
+      expect(reloadSize.height, repairSize.height);
+      expect(reloadSize.height, removeSize.height);
+      expect(reloadSize.height, addSize.height);
+      expect(addMenuSize.height, addSize.height);
+      expect(
+        reloadButton.style?.minimumSize?.resolve(const <WidgetState>{}),
+        const Size.square(40),
+      );
+      expect(reloadButton.style?.fixedSize, isNull);
+      expect(
+        reloadButton.style?.shape?.resolve(const <WidgetState>{}),
+        isA<CircleBorder>(),
+      );
+      expect(
+        reloadButton.style?.foregroundColor,
+        repairButton.style?.foregroundColor,
+      );
+      expect(
+        reloadButton.style?.backgroundColor,
+        repairButton.style?.backgroundColor,
+      );
+      expect(reloadButton.style?.side, repairButton.style?.side);
+      expect(addMenuButton.style?.side, isNull);
+      expect(
+        addMenuButton.style?.backgroundColor?.resolve(const <WidgetState>{}),
+        Colors.transparent,
+      );
+      expect(
+        addMenuButton.style?.backgroundColor?.resolve(const <WidgetState>{
+          WidgetState.hovered,
+        }),
+        isNot(Colors.transparent),
+      );
+      expect(reloadVisualSize.height, repairVisualSize.height);
+      expect(reloadVisualSize.height, removeVisualSize.height);
+      expect(reloadVisualSize.height, addVisualSize.height);
+      expect(addMenuVisualSize.height, addVisualSize.height);
+      final addMenuRectBeforeHover = tester.getRect(
+        find.byKey(const ValueKey('add-multiple-libraries-button')),
+      );
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: Offset.zero);
+      await mouse.moveTo(addMenuRectBeforeHover.center);
+      await tester.pump();
+      expect(
+        tester.getRect(
+          find.byKey(const ValueKey('add-multiple-libraries-button')),
+        ),
+        addMenuRectBeforeHover,
+      );
+      expect(
+        tester
+            .getSize(
+              find
+                  .descendant(
+                    of: find.byKey(
+                      const ValueKey('add-multiple-libraries-button'),
+                    ),
+                    matching: find.byType(Material),
+                  )
+                  .first,
+            )
+            .height,
+        addVisualSize.height,
+      );
+      await mouse.removePointer();
+      await tester.pump();
+      expect(repairRect.left - reloadRect.right, 10);
+      expect(removeRect.left - repairRect.right, 10);
+      expect(addRect.left - removeRect.right, 10);
+      await tester.tap(find.byKey(const ValueKey('repair-selected-libraries')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('batch-repair-preview-dialog')),
+        findsOneWidget,
+      );
+      expect(find.text('2 matched, 0 unmatched, 0 ambiguous.'), findsOneWidget);
+      await tester.tap(find.text('Confirm'));
+      await tester.pumpAndSettle();
+
+      expect(platform.upsertBatchCalls, 1);
+      expect(platform.upsertedNames, ['Alpha', 'Beta']);
+      expect(
+        find.byKey(const ValueKey('repair-selected-libraries')),
+        findsNothing,
+      );
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
   });
 
   testWidgets('diagnostics exposes direct library actions', (tester) async {
@@ -574,6 +843,15 @@ void main() {
   });
 }
 
+KontaktLibraryCandidate _widgetCandidate(String name, String snpid) {
+  return KontaktLibraryCandidate(
+    contentPath: '/Library/$name',
+    metadataPath: '/Library/$name/$name.nicnt',
+    metadata: ProductMetadata(name: name, regKey: name, snpid: snpid),
+    productHintsXml: '<ProductHints />',
+  );
+}
+
 class _FakeAppUpdatePlatform implements AppUpdatePlatform {
   _FakeAppUpdatePlatform({this.availableUpdate});
 
@@ -613,11 +891,15 @@ class _FakePlatform implements KontaktPlatform {
         },
       ),
     ],
+    this.candidates = const [],
   });
 
   List<KontaktLibrary> libraries;
+  final List<KontaktLibraryCandidate> candidates;
   List<KontaktLibrary>? savedOrder;
   final List<String> removedLibraryIds = <String>[];
+  final List<String> upsertedNames = <String>[];
+  int upsertBatchCalls = 0;
 
   @override
   PlatformCapabilities get capabilities => const PlatformCapabilities(
@@ -639,7 +921,7 @@ class _FakePlatform implements KontaktPlatform {
   @override
   Future<List<KontaktLibraryCandidate>> chooseLibraryCandidates({
     required bool allowMultiple,
-  }) async => const [];
+  }) async => candidates;
 
   @override
   Future<String?> chooseContentDirectory() async => null;
@@ -672,9 +954,39 @@ class _FakePlatform implements KontaktPlatform {
   }
 
   @override
+  Future<List<KontaktMutationResult>> removeLibraries(
+    List<KontaktLibrary> libraries,
+  ) async {
+    final results = <KontaktMutationResult>[];
+    for (final library in libraries) {
+      results.add(await removeLibrary(library));
+    }
+    return results;
+  }
+
+  @override
   Future<KontaktMutationResult> upsertLibrary(
     KontaktLibraryCandidate candidate,
-  ) => throw UnimplementedError();
+  ) async {
+    upsertedNames.add(candidate.metadata.name);
+    return KontaktMutationResult(
+      operation: KontaktMutationType.upsert,
+      libraryName: candidate.metadata.name,
+      changedPaths: const [],
+    );
+  }
+
+  @override
+  Future<List<KontaktMutationResult>> upsertLibraries(
+    List<KontaktLibraryCandidate> candidates,
+  ) async {
+    upsertBatchCalls++;
+    final results = <KontaktMutationResult>[];
+    for (final candidate in candidates) {
+      results.add(await upsertLibrary(candidate));
+    }
+    return results;
+  }
 
   @override
   Future<InventorySnapshot> scanLibraries() async => InventorySnapshot(

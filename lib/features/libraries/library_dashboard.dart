@@ -442,8 +442,8 @@ class _Sidebar extends StatelessWidget {
                 builder: (context, snapshot) {
                   final version = snapshot.data?.currentVersion.trim() ?? '';
                   final footer = version.isEmpty
-                      ? 'KLM - Juan Ayala'
-                      : 'KLM v$version - Juan Ayala';
+                      ? 'KLM cloin.se'
+                      : 'KLM v$version cloin.se';
                   return Text(
                     footer,
                     style: TextStyle(
@@ -648,6 +648,109 @@ class _LibraryActionController {
         context,
         () => controller.upsertCandidates([candidate], repair: true),
       );
+    } catch (error) {
+      if (context.mounted) await _showMutationError(context, error);
+    }
+  }
+
+  Future<void> repairLibraries(
+    BuildContext context,
+    List<KontaktLibrary> libraries,
+  ) async {
+    if (libraries.isEmpty) return;
+    try {
+      final candidates = await controller.chooseLibraryCandidates(
+        allowMultiple: true,
+      );
+      if (candidates.isEmpty || !context.mounted) return;
+      final preview = controller.previewRepairs(libraries, candidates);
+      final confirmed =
+          await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              key: const ValueKey('batch-repair-preview-dialog'),
+              icon: const Icon(Icons.build_circle_outlined),
+              title: Text(context.l10n.tr('confirmBatchRepairTitle')),
+              content: SizedBox(
+                width: 560,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 420),
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      Text(
+                        context.l10n.format('batchRepairSummary', {
+                          'matched': preview.matches.length,
+                          'unmatched': preview.unmatchedLibraries.length,
+                          'ambiguous': preview.ambiguousLibraries.length,
+                        }),
+                      ),
+                      if (preview.matches.isNotEmpty) ...[
+                        const SizedBox(height: 14),
+                        Text(
+                          context.l10n.tr('matchedRepairs'),
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        for (final match in preview.matches)
+                          ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(Icons.check_circle_outline),
+                            title: Text(match.library.name),
+                            subtitle: Text(match.candidate.contentPath),
+                          ),
+                      ],
+                      if (preview.unmatchedLibraries.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        Text(
+                          context.l10n.tr('unmatchedLibraries'),
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        for (final library in preview.unmatchedLibraries)
+                          ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(Icons.help_outline_rounded),
+                            title: Text(library.name),
+                          ),
+                      ],
+                      if (preview.ambiguousLibraries.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        Text(
+                          context.l10n.tr('ambiguousLibraries'),
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        for (final library in preview.ambiguousLibraries)
+                          ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(Icons.warning_amber_rounded),
+                            title: Text(library.name),
+                          ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              actions: preview.matches.isEmpty
+                  ? [
+                      FilledButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: Text(context.l10n.tr('close')),
+                      ),
+                    ]
+                  : _confirmationActions(context),
+            ),
+          ) ??
+          false;
+      if (!confirmed || !context.mounted) return;
+      await runMutation(context, () async {
+        await controller.upsertCandidates(
+          preview.matches.map((match) => match.candidate).toList(),
+          repair: true,
+        );
+        controller.clearSelection();
+      });
     } catch (error) {
       if (context.mounted) await _showMutationError(context, error);
     }
@@ -872,6 +975,17 @@ class _LibraryActionController {
     try {
       await operation();
       if (!context.mounted) return;
+      final orderWarning = controller.consumeClassicOrderWarning();
+      if (orderWarning != null) {
+        await _showMessage(
+          context,
+          context.l10n.format('recordsRemovedOrderWarning', {
+            'reason': orderWarning,
+          }),
+          title: context.l10n.tr('classicOrderNeedsRepair'),
+        );
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(context.l10n.tr('operationComplete'))),
       );
@@ -942,6 +1056,31 @@ class _InventoryView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final circularOutlinedActionButtonStyle = OutlinedButton.styleFrom(
+      minimumSize: const Size.square(40),
+      padding: EdgeInsets.zero,
+      shape: const CircleBorder(),
+    );
+    final circularBorderlessActionButtonStyle =
+        TextButton.styleFrom(
+          minimumSize: const Size.square(40),
+          padding: EdgeInsets.zero,
+          shape: const CircleBorder(),
+        ).copyWith(
+          backgroundColor: WidgetStateProperty.resolveWith((states) {
+            return states.contains(WidgetState.hovered)
+                ? context.klmColors.controlBorder
+                : Colors.transparent;
+          }),
+        );
+    final accentActionButtonStyle = FilledButton.styleFrom(
+      backgroundColor: context.klmColors.accentButtonBackground,
+      foregroundColor: context.klmColors.accentButtonForeground,
+      side: BorderSide(color: context.klmColors.accentButtonBorder),
+      elevation: 0,
+      shadowColor: Colors.transparent,
+    );
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(28, 24, 28, 20),
       child: Column(
@@ -950,6 +1089,37 @@ class _InventoryView extends StatelessWidget {
           _PageHeader(
             title: context.l10n.tr('inventoryTitle'),
             actions: [
+              Tooltip(
+                message: context.l10n.refresh,
+                child: OutlinedButton(
+                  key: const ValueKey('reload-libraries-button'),
+                  style: circularOutlinedActionButtonStyle,
+                  onPressed: controller.state == InventoryLoadState.loading
+                      ? null
+                      : controller.refresh,
+                  child: controller.state == InventoryLoadState.loading
+                      ? const SizedBox.square(
+                          dimension: 15,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.refresh_rounded, size: 18),
+                ),
+              ),
+              const SizedBox(width: 10),
+              if (controller.selectedLibrariesNeedingRepair.isNotEmpty) ...[
+                OutlinedButton.icon(
+                  key: const ValueKey('repair-selected-libraries'),
+                  onPressed: controller.mutationInProgress
+                      ? null
+                      : () => actions.repairLibraries(
+                          context,
+                          controller.selectedLibrariesNeedingRepair,
+                        ),
+                  icon: const Icon(Icons.build_outlined, size: 18),
+                  label: Text(context.l10n.tr('repairAction')),
+                ),
+                const SizedBox(width: 10),
+              ],
               if (controller.selectedLibraryCount > 0) ...[
                 FilledButton.icon(
                   key: const ValueKey('remove-selected-libraries'),
@@ -964,11 +1134,7 @@ class _InventoryView extends StatelessWidget {
                     foregroundColor: Colors.white,
                   ),
                   icon: const Icon(Icons.delete_outline_rounded, size: 18),
-                  label: Text(
-                    context.l10n.format('removeSelected', {
-                      'count': controller.selectedLibraryCount,
-                    }),
-                  ),
+                  label: Text(context.l10n.tr('removeAction')),
                 ),
                 const SizedBox(width: 10),
               ],
@@ -987,57 +1153,51 @@ class _InventoryView extends StatelessWidget {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.save_outlined, size: 18),
-                    label: Text(context.l10n.tr('saveChanges')),
+                    label: Text(context.l10n.tr('saveAction')),
                   ),
                 ),
                 const SizedBox(width: 10),
               ],
-              OutlinedButton.icon(
-                onPressed: controller.state == InventoryLoadState.loading
-                    ? null
-                    : controller.refresh,
-                icon: controller.state == InventoryLoadState.loading
-                    ? const SizedBox.square(
-                        dimension: 15,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.refresh_rounded, size: 18),
-                label: Text(context.l10n.refresh),
-              ),
-              const SizedBox(width: 10),
               FilledButton.icon(
                 key: const ValueKey('add-library-button'),
                 onPressed: controller.mutationInProgress
                     ? null
                     : () => actions.addLibraries(context, allowMultiple: false),
-                style: FilledButton.styleFrom(
-                  backgroundColor: context.klmColors.accentButtonBackground,
-                  foregroundColor: context.klmColors.accentButtonForeground,
-                  side: BorderSide(color: context.klmColors.accentButtonBorder),
-                  elevation: 0,
-                  shadowColor: Colors.transparent,
-                ),
+                style: accentActionButtonStyle,
                 icon: const Icon(Icons.add_rounded, size: 19),
-                label: Text(context.l10n.addLibrary),
+                label: Text(context.l10n.tr('addAction')),
               ),
               const SizedBox(width: 6),
-              PopupMenuButton<String>(
-                enabled: !controller.mutationInProgress,
-                tooltip: context.l10n.tr('addMultipleLibraries'),
-                icon: const Icon(Icons.arrow_drop_down_rounded),
-                onSelected: (_) =>
-                    actions.addLibraries(context, allowMultiple: true),
-                itemBuilder: (_) => [
-                  PopupMenuItem(
-                    value: 'multiple',
-                    child: ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.playlist_add_rounded),
-                      title: Text(context.l10n.tr('addMultipleLibraries')),
-                    ),
+              MenuAnchor(
+                menuChildren: [
+                  MenuItemButton(
+                    leadingIcon: const Icon(Icons.playlist_add_rounded),
+                    onPressed: controller.mutationInProgress
+                        ? null
+                        : () => actions.addLibraries(
+                            context,
+                            allowMultiple: true,
+                          ),
+                    child: Text(context.l10n.tr('addMultipleLibraries')),
                   ),
                 ],
+                builder: (context, menuController, _) => Tooltip(
+                  message: context.l10n.tr('addMultipleLibraries'),
+                  child: TextButton(
+                    key: const ValueKey('add-multiple-libraries-button'),
+                    style: circularBorderlessActionButtonStyle,
+                    onPressed: controller.mutationInProgress
+                        ? null
+                        : () {
+                            if (menuController.isOpen) {
+                              menuController.close();
+                            } else {
+                              menuController.open();
+                            }
+                          },
+                    child: const Icon(Icons.arrow_drop_down_rounded, size: 18),
+                  ),
+                ),
               ),
             ],
           ),
@@ -2400,7 +2560,11 @@ class _UpdateSettingsCardState extends State<_UpdateSettingsCard> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Icon(Icons.refresh_rounded, size: 18),
-          label: Text(context.l10n.tr('checkForUpdates')),
+          label: Text(
+            context.l10n.tr('checkForUpdates'),
+            maxLines: 1,
+            softWrap: false,
+          ),
         ),
       ),
     );
