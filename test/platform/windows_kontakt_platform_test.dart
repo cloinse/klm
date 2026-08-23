@@ -84,6 +84,21 @@ void main() {
     ).readAsStringSync();
 
     expect(helper, contains("Get-ObjectProperty \$request 'operations'"));
+    expect(
+      helper,
+      contains(
+        "  if (\$null -eq \$rawOperations) {\n"
+        "    \$requests = @(\$request)\n"
+        "  } else {\n"
+        "    \$requests = @(\$rawOperations)\n"
+        "  }\n"
+        "  if (\$requests.Count -lt 1",
+      ),
+    );
+    expect(
+      helper,
+      isNot(contains('\$requests = if (\$null -eq \$rawOperations)')),
+    );
     expect(helper, contains('New-MutationPlan'));
     expect(helper, contains("operation = 'batch'"));
     expect(helper, contains('Conflicting mutation targets.'));

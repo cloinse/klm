@@ -293,6 +293,7 @@ workflows:
       - name: Prepare verified Windows packaging tools
         script: |
           $ErrorActionPreference = 'Stop'
+          Set-StrictMode -Version 2.0
 
           $ParserTokens = $null
           $ParserErrors = $null
@@ -304,6 +305,20 @@ workflows:
           if ($ParserErrors.Count -ne 0) {
             $ParserErrors | ForEach-Object { Write-Error $_.Message }
             throw 'Windows helper syntax validation failed.'
+          }
+
+          # Reproduce the single-mutation collection semantics used by the
+          # helper. An if-expression would unwrap this PSCustomObject and make
+          # Count fail under StrictMode on Windows PowerShell 5.1.
+          $SingleMutationRequest = [pscustomobject]@{ operation = 'remove' }
+          $RawMutationOperations = $null
+          if ($null -eq $RawMutationOperations) {
+            $MutationRequests = @($SingleMutationRequest)
+          } else {
+            $MutationRequests = @($RawMutationOperations)
+          }
+          if ($MutationRequests.Count -ne 1) {
+            throw 'Windows helper single-mutation normalization failed.'
           }
 
           $HelperSmokeResponse = Join-Path $env:TEMP 'klm-helper-smoke.json'

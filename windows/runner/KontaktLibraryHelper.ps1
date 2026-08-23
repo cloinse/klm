@@ -797,7 +797,13 @@ function New-MutationPlan {
 function Invoke-Mutation {
   $request = Get-VerifiedRequest 'mutation'
   $rawOperations = Get-ObjectProperty $request 'operations'
-  $requests = if ($null -eq $rawOperations) { @($request) } else { @($rawOperations) }
+  # Assign within each branch so a single PSCustomObject remains an array.
+  # Returning @($request) from an if-expression is unwrapped by PowerShell.
+  if ($null -eq $rawOperations) {
+    $requests = @($request)
+  } else {
+    $requests = @($rawOperations)
+  }
   if ($requests.Count -lt 1 -or $requests.Count -gt 1000) {
     throw 'Invalid mutation batch size.'
   }

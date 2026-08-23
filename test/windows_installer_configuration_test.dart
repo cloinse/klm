@@ -54,4 +54,19 @@ void main() {
       contains('set_app_details(L"cloin.se", L"Kontakt Library Manager"'),
     );
   });
+
+  test('Windows CI validates single-mutation PowerShell semantics', () {
+    final codemagic = File('codemagic.yaml').readAsStringSync();
+
+    expect(codemagic, contains('Set-StrictMode -Version 2.0'));
+    expect(
+      codemagic,
+      contains("\$MutationRequests = @(\$SingleMutationRequest)"),
+    );
+    expect(codemagic, contains("if (\$MutationRequests.Count -ne 1)"));
+    expect(
+      codemagic,
+      contains('Windows helper single-mutation normalization failed.'),
+    );
+  });
 }

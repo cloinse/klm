@@ -1,5 +1,8 @@
-- Added clickable status cards to filter libraries by Healthy, Needs Attention, Offline, or Total.
-- Added multi-selection and batch removal for library records, with confirmation and classic-order preservation.
-- Added direct library actions to Diagnostics, including showing the folder, repairing, relocating, and removing records.
-- Improved batch-removal recovery so the inventory stays synchronized after partial platform failures.
-- Preserved native language names in the language selector, including English, Español, Português (Brasil), and 简体中文.
+- Improved Kontakt library discovery on macOS and Windows while filtering unrelated Service Center product records.
+- Added batch repair with deterministic folder matching and a preview for matched, unmatched, and ambiguous libraries.
+- Added transactional batch additions, repairs, and removals that request administrator authorization only once.
+- Prevented malformed or duplicate classic-order data from blocking successful library removal, with a warning when the order still needs attention.
+- Refined the library toolbar so Repair appears only for selected libraries that need attention and action controls remain compact across languages.
+- Hidden PowerShell windows during Windows inventory and mutation tasks while preserving the required UAC confirmation.
+- Fixed single-library removal on Windows from both the toolbar and the library actions menu.
+- Updated application, installer, updater, and About branding to use cloin.se.
