@@ -5,24 +5,22 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
         <title>Kontakt Library Manager</title>
         <item>
             <title>0.2.6</title>
-            <pubDate>Mon, 24 Aug 2026 01:25:30 +0000</pubDate>
+            <pubDate>Sun, 23 Aug 2026 19:57:07 -0600</pubDate>
             <sparkle:version>18</sparkle:version>
             <sparkle:shortVersionString>0.2.6</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>10.15</sparkle:minimumSystemVersion>
 <description sparkle:format="plain-text"><![CDATA[
-- Improved Kontakt library discovery on macOS and Windows while filtering unrelated Service Center product records.
-- Added batch repair with deterministic folder matching and a preview for matched, unmatched, and ambiguous libraries.
-- Added transactional batch additions, repairs, and removals that request administrator authorization only once.
-- Prevented malformed or duplicate classic-order data from blocking successful library removal, with a warning when the order still needs attention.
-- Refined the library toolbar so Repair appears only for selected libraries that need attention and action controls remain compact across languages.
-- Hidden PowerShell windows during Windows inventory and mutation tasks while preserving the required UAC confirmation.
-- Fixed single-library removal on Windows from both the toolbar and the library actions menu.
-- Updated application, installer, updater, and About branding to use cloin.se.
+- Improved Kontakt library detection on macOS and Windows while excluding unrelated products.
+- Added batch operations for adding, repairing, and removing libraries with a single administrator authorization.
+- Added multi-library repair with a preview and automatic exclusion of healthy libraries.
+- macOS now processes batch changes transactionally and can roll them back if an error occurs.
+- Windows now uses native operations for improved performance.
+- Classic-order errors no longer prevent libraries from being removed successfully.
 ]]></description>
             <enclosure url="https://github.com/cloinse/klm/releases/download/v0.2.6/klm-macos-v0.2.6.dmg" length="21775462" type="application/octet-stream" sparkle:edSignature="rdgqd1F5kepDLG5HBnZ7ckB2mqkzH8Bg8vjb4veFgLSAnbFUb7u2IRDweoynIKbWc2OnnT6MDJnMiGz5JhHEDg=="></enclosure>
         </item>
     </channel>
 </rss><!-- sparkle-signatures:
-edSignature: GpHhv31n7rE7X9BR/h9YsTcQRvYdYigKJmOea21xE0DHOS8bfIVWeRNbbDczK2py2qpWKmhsqftvLQWl//s4AQ==
-length: 2063
+edSignature: AY/Mz9bB3dWpOqmoYicp9gnMfpJZa4lNRYHpD752V/e+cGpBVVY4RM7Lk9JmDcN8uaPPCMXSnNZKj0PMrVrJAQ==
+length: 1664
 -->
