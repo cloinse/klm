@@ -4,22 +4,25 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     <channel>
         <title>Kontakt Library Manager</title>
         <item>
-            <title>0.2.5</title>
-            <pubDate>Sun, 16 Aug 2026 22:05:00 +0000</pubDate>
-            <sparkle:version>17</sparkle:version>
-            <sparkle:shortVersionString>0.2.5</sparkle:shortVersionString>
+            <title>0.2.6</title>
+            <pubDate>Mon, 24 Aug 2026 01:25:30 +0000</pubDate>
+            <sparkle:version>18</sparkle:version>
+            <sparkle:shortVersionString>0.2.6</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>10.15</sparkle:minimumSystemVersion>
 <description sparkle:format="plain-text"><![CDATA[
-- Added clickable status cards to filter libraries by Healthy, Needs Attention, Offline, or Total.
-- Added multi-selection and batch removal for library records, with confirmation and classic-order preservation.
-- Added direct library actions to Diagnostics, including showing the folder, repairing, relocating, and removing records.
-- Improved batch-removal recovery so the inventory stays synchronized after partial platform failures.
-- Preserved native language names in the language selector, including English, Español, Português (Brasil), and 简体中文.
+- Improved Kontakt library discovery on macOS and Windows while filtering unrelated Service Center product records.
+- Added batch repair with deterministic folder matching and a preview for matched, unmatched, and ambiguous libraries.
+- Added transactional batch additions, repairs, and removals that request administrator authorization only once.
+- Prevented malformed or duplicate classic-order data from blocking successful library removal, with a warning when the order still needs attention.
+- Refined the library toolbar so Repair appears only for selected libraries that need attention and action controls remain compact across languages.
+- Hidden PowerShell windows during Windows inventory and mutation tasks while preserving the required UAC confirmation.
+- Fixed single-library removal on Windows from both the toolbar and the library actions menu.
+- Updated application, installer, updater, and About branding to use cloin.se.
 ]]></description>
-            <enclosure url="https://github.com/cloinse/klm/releases/download/v0.2.5/klm-macos-v0.2.5.dmg" length="21702195" type="application/octet-stream" sparkle:edSignature="1D98CKx+OK8SsfyaWAOeJ0C8JujYseYNC4IkP0hC2IPWe4fD0hZK3Q3/i4TKZEydSWB0zkiOUrQEpQXc0iE3Bw=="></enclosure>
+            <enclosure url="https://github.com/cloinse/klm/releases/download/v0.2.6/klm-macos-v0.2.6.dmg" length="21775462" type="application/octet-stream" sparkle:edSignature="rdgqd1F5kepDLG5HBnZ7ckB2mqkzH8Bg8vjb4veFgLSAnbFUb7u2IRDweoynIKbWc2OnnT6MDJnMiGz5JhHEDg=="></enclosure>
         </item>
     </channel>
 </rss><!-- sparkle-signatures:
-edSignature: 6pwoY2t6VWeTHhiqHUT9enCKETVcNnSz3EUXk5nnBnDUl3ei3iwqZGfFd9QWAgcd+GEoK+SKmfz3DJc520LfAQ==
-length: 1689
+edSignature: GpHhv31n7rE7X9BR/h9YsTcQRvYdYigKJmOea21xE0DHOS8bfIVWeRNbbDczK2py2qpWKmhsqftvLQWl//s4AQ==
+length: 2063
 -->
