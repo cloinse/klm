@@ -336,6 +336,19 @@ class LibraryInventoryController extends ChangeNotifier {
             library.name.trim().toLowerCase();
   }
 
+  List<KontaktLibraryCandidate> candidatesNotRegistered(
+    Iterable<KontaktLibraryCandidate> candidates,
+  ) {
+    final registeredLibraries = snapshot?.libraries ?? const <KontaktLibrary>[];
+    return candidates
+        .where(
+          (candidate) => !registeredLibraries.any(
+            (library) => candidateMatchesLibrary(candidate, library),
+          ),
+        )
+        .toList(growable: false);
+  }
+
   LibraryRepairPreview previewRepairs(
     List<KontaktLibrary> libraries,
     List<KontaktLibraryCandidate> candidates,
@@ -413,19 +426,17 @@ class LibraryInventoryController extends ChangeNotifier {
     required bool repair,
   }) async {
     if (candidates.isEmpty) return;
+    var candidatesToUpsert = candidates;
     if (!repair) {
-      for (final candidate in candidates) {
-        for (final library in snapshot?.libraries ?? const <KontaktLibrary>[]) {
-          if (candidateMatchesLibrary(candidate, library)) {
-            throw LibraryAlreadyRegistered(candidate.metadata.name);
-          }
-        }
+      candidatesToUpsert = candidatesNotRegistered(candidates);
+      if (candidatesToUpsert.isEmpty) {
+        throw LibraryAlreadyRegistered(candidates.first.metadata.name);
       }
     }
     await _runMutation(() async {
       await _ensureHelperEnabled();
-      await platform.upsertLibraries(candidates);
-      for (final candidate in candidates) {
+      await platform.upsertLibraries(candidatesToUpsert);
+      for (final candidate in candidatesToUpsert) {
         _log(
           repair ? 'library_repaired' : 'library_added',
           candidate.metadata.name,

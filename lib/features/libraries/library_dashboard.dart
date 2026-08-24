@@ -611,15 +611,19 @@ class _LibraryActionController {
         allowMultiple: allowMultiple,
       );
       if (candidates.isEmpty || !context.mounted) return;
+      final candidatesToAdd = controller.candidatesNotRegistered(candidates);
+      if (candidatesToAdd.isEmpty) {
+        throw LibraryAlreadyRegistered(candidates.first.metadata.name);
+      }
       final confirmed = await _confirmCandidates(
         context,
-        candidates,
+        candidatesToAdd,
         repair: false,
       );
       if (!confirmed || !context.mounted) return;
       await runMutation(
         context,
-        () => controller.upsertCandidates(candidates, repair: false),
+        () => controller.upsertCandidates(candidatesToAdd, repair: false),
       );
     } catch (error) {
       if (context.mounted) await _showMutationError(context, error);

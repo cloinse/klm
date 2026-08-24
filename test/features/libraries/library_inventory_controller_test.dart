@@ -251,6 +251,51 @@ void main() {
   });
 
   test(
+    'skips registered candidates while adding the rest of a batch',
+    () async {
+      final platform = _OrderPlatform();
+      final controller = LibraryInventoryController(platform);
+      addTearDown(controller.dispose);
+      await controller.refresh();
+
+      await controller.upsertCandidates([
+        _candidate('Alpha', 'Alpha', 'A01'),
+        _candidate('Delta', 'Delta', 'D01'),
+      ], repair: false);
+
+      expect(platform.upsertBatchCalls, 1);
+      expect(platform.upsertedNames, ['Delta']);
+      expect(
+        controller.logs
+            .where((log) => log.code == 'library_added')
+            .map((log) => log.detail),
+        ['Delta'],
+      );
+    },
+  );
+
+  test(
+    'keeps the already registered error when no candidate can be added',
+    () async {
+      final platform = _OrderPlatform();
+      final controller = LibraryInventoryController(platform);
+      addTearDown(controller.dispose);
+      await controller.refresh();
+
+      await expectLater(
+        controller.upsertCandidates([
+          _candidate('Alpha', 'Alpha', 'A01'),
+          _candidate('Beta', 'Beta', 'B01'),
+        ], repair: false),
+        throwsA(isA<LibraryAlreadyRegistered>()),
+      );
+
+      expect(platform.upsertBatchCalls, 0);
+      expect(platform.upsertedNames, isEmpty);
+    },
+  );
+
+  test(
     'keeps removals successful when classic order persistence fails',
     () async {
       final platform = _OrderPlatform()..throwOnSave = true;
