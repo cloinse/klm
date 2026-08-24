@@ -55,18 +55,12 @@ void main() {
     );
   });
 
-  test('Windows CI validates single-mutation PowerShell semantics', () {
+  test('Codemagic does not configure Windows builds', () {
     final codemagic = File('codemagic.yaml').readAsStringSync();
 
-    expect(codemagic, contains('Set-StrictMode -Version 2.0'));
-    expect(
-      codemagic,
-      contains("\$MutationRequests = @(\$SingleMutationRequest)"),
-    );
-    expect(codemagic, contains("if (\$MutationRequests.Count -ne 1)"));
-    expect(
-      codemagic,
-      contains('Windows helper single-mutation normalization failed.'),
-    );
+    expect(codemagic, isNot(contains('windows-release:')));
+    expect(codemagic, isNot(contains('flutter build windows')));
+    expect(codemagic, isNot(contains('klm-windows-v')));
+    expect(codemagic, isNot(contains('Inno Setup')));
   });
 }
