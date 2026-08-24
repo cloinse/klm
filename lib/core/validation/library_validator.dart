@@ -6,6 +6,46 @@ class LibraryValidator {
   const LibraryValidator();
 
   List<KontaktLibrary> validate(List<KontaktLibrary> libraries) {
+    return _validate(
+      libraries,
+      pathExists: (path) => Directory(path).existsSync(),
+    );
+  }
+
+  Future<List<KontaktLibrary>> validateAsync(
+    List<KontaktLibrary> libraries, {
+    Duration pathCheckTimeout = const Duration(seconds: 5),
+    Future<bool> Function(String path)? pathExists,
+  }) async {
+    final probe = pathExists ?? (path) => Directory(path).exists();
+    final paths = <String, String>{};
+    for (final library in libraries) {
+      final path = library.contentPath?.trim();
+      if (path?.isNotEmpty == true) {
+        paths.putIfAbsent(path!.toLowerCase(), () => path);
+      }
+    }
+
+    final results = await Future.wait(
+      paths.entries.map((entry) async {
+        var exists = false;
+        try {
+          exists = await probe(entry.value).timeout(pathCheckTimeout);
+        } catch (_) {}
+        return MapEntry(entry.key, exists);
+      }),
+    );
+    final pathStates = Map<String, bool>.fromEntries(results);
+    return _validate(
+      libraries,
+      pathExists: (path) => pathStates[path.toLowerCase()] ?? false,
+    );
+  }
+
+  List<KontaktLibrary> _validate(
+    List<KontaktLibrary> libraries, {
+    required bool Function(String path) pathExists,
+  }) {
     final snpidCounts = <String, int>{};
     final pathCounts = <String, int>{};
 
@@ -75,7 +115,7 @@ class LibraryValidator {
                 severity: IssueSeverity.error,
               ),
             );
-          } else if (!Directory(path).existsSync()) {
+          } else if (!pathExists(path)) {
             issues.add(
               const LibraryIssue(
                 code: 'content_offline',

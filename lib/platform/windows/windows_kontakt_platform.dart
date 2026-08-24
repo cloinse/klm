@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:file_selector_platform_interface/file_selector_platform_interface.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:kontakt_library_manager/core/metadata/product_hints_parser.dart';
 import 'package:kontakt_library_manager/core/models/kontakt_library.dart';
@@ -12,9 +13,13 @@ import 'package:kontakt_library_manager/core/validation/classic_order_validator.
 import 'package:kontakt_library_manager/features/mutations/library_candidate_scanner.dart';
 import 'package:kontakt_library_manager/platform/inventory_assembler.dart';
 import 'package:kontakt_library_manager/platform/kontakt_platform.dart';
+import 'package:kontakt_library_manager/platform/windows/windows_native_mutation_codec.dart';
 import 'package:kontakt_library_manager/platform/windows/windows_portable_settings.dart';
 
 class WindowsKontaktPlatform implements KontaktPlatform {
+  static const _registryChannel = MethodChannel(
+    'com.juanayala.kontaktLibraryManager/windows_registry',
+  );
   static const _hiddenPowerShellArguments = <String>[
     '-NoLogo',
     '-NoProfile',
@@ -65,15 +70,18 @@ class WindowsKontaktPlatform implements KontaktPlatform {
   }
 
   Future<InventorySnapshot> _scanStandardLibraries() async {
+    final totalStopwatch = Stopwatch()..start();
     final assembler = InventoryAssembler();
     final diagnostics = <InventoryDiagnostic>[];
     final knownRegKeys = <String>{};
     final excludedRegKeys = <String>{};
+    final registryResult = _readRegistryRecords();
     final programFiles =
         Platform.environment['PROGRAMFILES'] ?? r'C:\Program Files';
     final publicDirectory =
         Platform.environment['PUBLIC'] ?? r'C:\Users\Public';
 
+    final xmlStopwatch = Stopwatch()..start();
     await _readXmlDirectory(
       Directory(
         serviceCenterPath ??
@@ -83,6 +91,8 @@ class WindowsKontaktPlatform implements KontaktPlatform {
       knownRegKeys,
       excludedRegKeys,
     );
+    xmlStopwatch.stop();
+    final jsonStopwatch = Stopwatch()..start();
     await _readJsonDirectory(
       Directory(
         installedProductsPath ??
@@ -93,13 +103,35 @@ class WindowsKontaktPlatform implements KontaktPlatform {
       knownRegKeys,
       excludedRegKeys,
     );
-    await _readRegistry(assembler, diagnostics, knownRegKeys, excludedRegKeys);
+    jsonStopwatch.stop();
+    final loadedRegistry = await registryResult;
+    diagnostics.addAll(loadedRegistry.diagnostics);
+    _addRegistryRecords(
+      loadedRegistry.records,
+      assembler,
+      knownRegKeys,
+      excludedRegKeys,
+    );
 
-    final libraries = _validator.validate(assembler.build())
+    final validationStopwatch = Stopwatch()..start();
+    final libraries = await _validator.validateAsync(assembler.build())
       ..sort(
         (left, right) =>
             left.name.toLowerCase().compareTo(right.name.toLowerCase()),
       );
+    validationStopwatch.stop();
+    totalStopwatch.stop();
+    if (!kReleaseMode) {
+      debugPrint(
+        '[KLM inventory] XML=${xmlStopwatch.elapsedMilliseconds}ms '
+        'JSON=${jsonStopwatch.elapsedMilliseconds}ms '
+        'Registry=${loadedRegistry.elapsed.inMilliseconds}ms '
+        '(${loadedRegistry.source}) '
+        'Validation=${validationStopwatch.elapsedMilliseconds}ms '
+        'Total=${totalStopwatch.elapsedMilliseconds}ms '
+        'Libraries=${libraries.length}',
+      );
+    }
     return InventorySnapshot(
       libraries: libraries,
       diagnostics: diagnostics,
@@ -151,7 +183,7 @@ class WindowsKontaktPlatform implements KontaktPlatform {
       }
     }
 
-    final libraries = _validator.validate(assembler.build())
+    final libraries = await _validator.validateAsync(assembler.build())
       ..sort(
         (left, right) =>
             left.name.toLowerCase().compareTo(right.name.toLowerCase()),
@@ -247,23 +279,43 @@ class WindowsKontaktPlatform implements KontaktPlatform {
     }
   }
 
-  Future<void> _readRegistry(
-    InventoryAssembler assembler,
-    List<InventoryDiagnostic> diagnostics,
-    Set<String> knownRegKeys,
-    Set<String> excludedRegKeys,
-  ) async {
+  Future<_RegistryReadResult> _readRegistryRecords() async {
+    final stopwatch = Stopwatch()..start();
+    try {
+      final rawRecords =
+          await _registryChannel.invokeListMethod<Object?>('readInventory') ??
+          const <Object?>[];
+      stopwatch.stop();
+      return _RegistryReadResult(
+        records: _decodeRegistryRecords(rawRecords),
+        source: 'native',
+        elapsed: stopwatch.elapsed,
+      );
+    } on MissingPluginException {
+      final fallback = await _readRegistryRecordsWithPowerShell();
+      stopwatch.stop();
+      return fallback.withElapsed(stopwatch.elapsed);
+    } on PlatformException {
+      final fallback = await _readRegistryRecordsWithPowerShell();
+      stopwatch.stop();
+      return fallback.withElapsed(stopwatch.elapsed);
+    }
+  }
+
+  Future<_RegistryReadResult> _readRegistryRecordsWithPowerShell() async {
     final helper = _helperFile;
     if (!await helper.exists()) {
-      diagnostics.add(
-        const InventoryDiagnostic(
-          code: 'windows_helper_missing',
-          title: 'Componente de Windows no encontrado',
-          message: 'No se pudo leer el Registro de Native Instruments.',
-          severity: IssueSeverity.warning,
-        ),
+      return const _RegistryReadResult(
+        source: 'powershell',
+        diagnostics: <InventoryDiagnostic>[
+          InventoryDiagnostic(
+            code: 'windows_helper_missing',
+            title: 'Componente de Windows no encontrado',
+            message: 'No se pudo leer el Registro de Native Instruments.',
+            severity: IssueSeverity.warning,
+          ),
+        ],
       );
-      return;
     }
 
     final temporaryDirectory = await Directory.systemTemp.createTemp(
@@ -286,47 +338,75 @@ class WindowsKontaktPlatform implements KontaktPlatform {
         throw const FormatException('Registry helper failed.');
       }
       final decoded = jsonDecode(await responseFile.readAsString());
-      final records = decoded is List ? decoded : <Object?>[decoded];
-      for (final record in records.whereType<Map<String, dynamic>>()) {
-        final regKey = record['regKey'] as String?;
-        final snpid = record['snpid'] as String?;
-        final contentPath = record['contentPath'] as String?;
-        final isKnownLibrary =
-            regKey != null &&
-            knownRegKeys.contains(regKey.trim().toLowerCase());
-        final isExcluded =
-            regKey != null &&
-            excludedRegKeys.contains(regKey.trim().toLowerCase());
-        final hasLibraryIdentity =
-            snpid?.trim().isNotEmpty == true &&
-            contentPath?.trim().isNotEmpty == true;
-        if (regKey == null ||
-            isExcluded ||
-            (!isKnownLibrary && !hasLibraryIdentity)) {
-          continue;
-        }
-        assembler.add(
-          name: record['name'] as String? ?? regKey,
-          regKey: regKey,
-          snpid: snpid,
-          contentPath: contentPath,
-          visibility: _intValue(record['visibility']),
-          userListIndex: record['userListIndex'] as int?,
-          source: RegistrationSource.windowsRegistry,
-        );
-      }
+      final rawRecords = decoded is List ? decoded : <Object?>[decoded];
+      return _RegistryReadResult(
+        records: _decodeRegistryRecords(rawRecords.cast<Object?>()),
+        source: 'powershell',
+      );
     } catch (error) {
-      diagnostics.add(
-        InventoryDiagnostic(
-          code: 'windows_registry_failed',
-          title: 'No se pudo leer el Registro',
-          message: error.toString(),
-          severity: IssueSeverity.warning,
-          detail: error.toString(),
-        ),
+      return _RegistryReadResult(
+        source: 'powershell',
+        diagnostics: <InventoryDiagnostic>[
+          InventoryDiagnostic(
+            code: 'windows_registry_failed',
+            title: 'No se pudo leer el Registro',
+            message: error.toString(),
+            severity: IssueSeverity.warning,
+            detail: error.toString(),
+          ),
+        ],
       );
     } finally {
       await temporaryDirectory.delete(recursive: true);
+    }
+  }
+
+  List<Map<String, Object?>> _decodeRegistryRecords(List<Object?> rawRecords) {
+    final records = <Map<String, Object?>>[];
+    for (final rawRecord in rawRecords) {
+      if (rawRecord is! Map) continue;
+      final record = <String, Object?>{};
+      for (final entry in rawRecord.entries) {
+        final key = entry.key;
+        if (key is String) record[key] = entry.value;
+      }
+      records.add(record);
+    }
+    return records;
+  }
+
+  void _addRegistryRecords(
+    List<Map<String, Object?>> records,
+    InventoryAssembler assembler,
+    Set<String> knownRegKeys,
+    Set<String> excludedRegKeys,
+  ) {
+    for (final record in records) {
+      final regKey = record['regKey'] as String?;
+      final snpid = record['snpid'] as String?;
+      final contentPath = record['contentPath'] as String?;
+      final isKnownLibrary =
+          regKey != null && knownRegKeys.contains(regKey.trim().toLowerCase());
+      final isExcluded =
+          regKey != null &&
+          excludedRegKeys.contains(regKey.trim().toLowerCase());
+      final hasLibraryIdentity =
+          snpid?.trim().isNotEmpty == true &&
+          contentPath?.trim().isNotEmpty == true;
+      if (regKey == null ||
+          isExcluded ||
+          (!isKnownLibrary && !hasLibraryIdentity)) {
+        continue;
+      }
+      assembler.add(
+        name: record['name'] as String? ?? regKey,
+        regKey: regKey,
+        snpid: snpid,
+        contentPath: contentPath,
+        visibility: _intValue(record['visibility']),
+        userListIndex: _intValue(record['userListIndex']),
+        source: RegistrationSource.windowsRegistry,
+      );
     }
   }
 
@@ -377,6 +457,13 @@ class WindowsKontaktPlatform implements KontaktPlatform {
         // Kontakt's classic browser stores positions as a one-based sequence.
         'userListIndex': index + 1,
       });
+    }
+
+    try {
+      await _registryChannel.invokeMethod<void>('writeClassicOrder', entries);
+      return;
+    } on MissingPluginException {
+      // Older runners continue to use the PowerShell implementation.
     }
 
     await _executeHelperRequest(
@@ -528,6 +615,11 @@ class WindowsKontaktPlatform implements KontaktPlatform {
     '${Platform.pathSeparator}KontaktLibraryHelper.ps1',
   );
 
+  File get _elevatorFile => File(
+    '${File(Platform.resolvedExecutable).parent.path}'
+    '${Platform.pathSeparator}KontaktLibraryElevator.exe',
+  );
+
   Future<KontaktMutationResult> _executeMutation(
     Map<String, Object> request,
   ) async {
@@ -569,32 +661,58 @@ class WindowsKontaktPlatform implements KontaktPlatform {
     final requestFile = File(
       '${temporaryDirectory.path}${Platform.pathSeparator}request.json',
     );
+    final nativeRequestFile = File(
+      '${temporaryDirectory.path}${Platform.pathSeparator}request.bin',
+    );
     final responseFile = File(
       '${temporaryDirectory.path}${Platform.pathSeparator}response.json',
     );
     try {
-      final requestBytes = utf8.encode(jsonEncode(request));
-      if (requestBytes.length > 2500000) {
-        throw PlatformException(
-          code: 'mutation_request_too_large',
-          message: 'The mutation request is too large.',
-        );
+      final elevator = _elevatorFile;
+      final useNativeMutation = mode == 'mutation' && await elevator.exists();
+      late final ProcessResult process;
+      if (useNativeMutation) {
+        late final List<int> nativeRequestBytes;
+        try {
+          nativeRequestBytes = WindowsNativeMutationCodec.encode(request);
+        } on FormatException catch (error) {
+          throw PlatformException(
+            code: 'mutation_request_invalid',
+            message: error.message,
+          );
+        }
+        await nativeRequestFile.writeAsBytes(nativeRequestBytes, flush: true);
+        final nativeDigest = sha256.convert(nativeRequestBytes).toString();
+        process = await Process.run(elevator.path, [
+          '--native-mutation',
+          nativeRequestFile.path,
+          nativeDigest,
+          responseFile.path,
+        ]);
+      } else {
+        final requestBytes = utf8.encode(jsonEncode(request));
+        if (requestBytes.length > 2500000) {
+          throw PlatformException(
+            code: 'mutation_request_too_large',
+            message: 'The mutation request is too large.',
+          );
+        }
+        await requestFile.writeAsBytes(requestBytes, flush: true);
+        final digest = sha256.convert(requestBytes).toString();
+        process = await Process.run('powershell.exe', [
+          ..._hiddenPowerShellArguments,
+          '-File',
+          helper.path,
+          '-Mode',
+          mode,
+          '-RequestPath',
+          requestFile.path,
+          '-RequestSha256',
+          digest,
+          '-ResponsePath',
+          responseFile.path,
+        ]);
       }
-      await requestFile.writeAsBytes(requestBytes, flush: true);
-      final digest = sha256.convert(requestBytes).toString();
-      final process = await Process.run('powershell.exe', [
-        ..._hiddenPowerShellArguments,
-        '-File',
-        helper.path,
-        '-Mode',
-        mode,
-        '-RequestPath',
-        requestFile.path,
-        '-RequestSha256',
-        digest,
-        '-ResponsePath',
-        responseFile.path,
-      ]);
 
       Map<String, dynamic>? response;
       if (await responseFile.exists()) {
@@ -634,4 +752,25 @@ class WindowsKontaktPlatform implements KontaktPlatform {
       !value.contains('\u0000') &&
       !value.contains('\n') &&
       !value.contains('\r');
+}
+
+class _RegistryReadResult {
+  const _RegistryReadResult({
+    this.records = const <Map<String, Object?>>[],
+    this.diagnostics = const <InventoryDiagnostic>[],
+    this.source = 'unknown',
+    this.elapsed = Duration.zero,
+  });
+
+  final List<Map<String, Object?>> records;
+  final List<InventoryDiagnostic> diagnostics;
+  final String source;
+  final Duration elapsed;
+
+  _RegistryReadResult withElapsed(Duration value) => _RegistryReadResult(
+    records: records,
+    diagnostics: diagnostics,
+    source: source,
+    elapsed: value,
+  );
 }

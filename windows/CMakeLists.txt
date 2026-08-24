@@ -84,6 +84,9 @@ endif()
 install(TARGETS ${BINARY_NAME} RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}"
   COMPONENT Runtime)
 
+install(TARGETS kontakt_library_elevator
+  RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}" COMPONENT Runtime)
+
 # One-shot Windows helper. The installer places the complete bundle under
 # Program Files, while the application itself continues to run asInvoker.
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/runner/KontaktLibraryHelper.ps1"

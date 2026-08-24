@@ -9,12 +9,34 @@ project(runner LANGUAGES CXX)
 add_executable(${BINARY_NAME} WIN32
   "flutter_window.cpp"
   "main.cpp"
+  "registry_bridge.cpp"
   "update_bridge.cpp"
   "utils.cpp"
   "win32_window.cpp"
   "${FLUTTER_MANAGED_DIR}/generated_plugin_registrant.cc"
   "Runner.rc"
   "runner.exe.manifest"
+)
+
+add_executable(kontakt_library_elevator WIN32
+  "elevated_process_runner.cpp"
+  "native_mutation.cpp"
+)
+set_target_properties(kontakt_library_elevator PROPERTIES
+  OUTPUT_NAME "KontaktLibraryElevator"
+)
+apply_standard_settings(kontakt_library_elevator)
+target_compile_definitions(kontakt_library_elevator PRIVATE
+  "NOMINMAX"
+  "WIN32_LEAN_AND_MEAN"
+)
+target_link_libraries(kontakt_library_elevator PRIVATE
+  "advapi32.lib"
+  "bcrypt.lib"
+  "msxml6.lib"
+  "ole32.lib"
+  "oleaut32.lib"
+  "shell32.lib"
 )
 
 # Apply the standard set of build settings. This can be removed for applications
@@ -35,6 +57,7 @@ target_compile_definitions(${BINARY_NAME} PRIVATE "NOMINMAX")
 # dependencies here.
 target_link_libraries(${BINARY_NAME} PRIVATE flutter flutter_wrapper_app)
 target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib")
+target_link_libraries(${BINARY_NAME} PRIVATE "advapi32.lib")
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
 # Run the Flutter tool portions of the build. This must not be removed.
