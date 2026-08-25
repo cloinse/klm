@@ -3,19 +3,20 @@
   <channel>
     <title>Kontakt Library Manager - Windows</title>
     <item>
-      <title>0.2.7</title>
-      <pubDate>Mon, 24 Aug 2026 05:50:05 GMT</pubDate>
-      <sparkle:version>19</sparkle:version>
-      <sparkle:shortVersionString>0.2.7</sparkle:shortVersionString>
+      <title>0.2.8</title>
+      <pubDate>Tue, 25 Aug 2026 20:24:18 GMT</pubDate>
+      <sparkle:version>20</sparkle:version>
+      <sparkle:shortVersionString>0.2.8</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>10.0</sparkle:minimumSystemVersion>
-      <description sparkle:format="plain-text"><![CDATA[- Improved Kontakt library detection on macOS and Windows while excluding unrelated products.
-- Added batch operations for adding, repairing, and removing libraries with a single administrator authorization.
-- Added multi-library repair with a preview and automatic exclusion of healthy libraries.
-- macOS now processes batch changes transactionally and can roll them back if an error occurs.
-- Windows now uses native operations for improved performance.
-- Classic-order errors no longer prevent libraries from being removed successfully.
-- Fixed multi-library additions on macOS and Windows so already registered libraries are skipped while the remaining selected libraries continue installing.]]></description>
-      <enclosure url="https://github.com/cloinse/klm/releases/download/v0.2.7/klm-windows-v0.2.7.exe" length="14888662" type="application/octet-stream" sparkle:os="windows-x64" sparkle:installerArguments="/SILENT /SP- /NOICONS /NORESTART" sparkle:edSignature="uQAH8iO9kMaHfBHN9jVnNbmVkz5Dujjye0d3plZpQpZD7BRrffyO1bOZMA1dSIVU5Vhpvp8KtqI0/0QbJo4TAQ==" />
+      <description sparkle:format="plain-text"><![CDATA[- Performance and security improvements.]]></description>
+      <enclosure
+        url="https://github.com/cloinse/klm/releases/download/v0.2.8/klm-windows-v0.2.8.exe"
+        length="14926089"
+        type="application/octet-stream"
+        sparkle:os="windows-x64"
+        sparkle:installerArguments="/SILENT /SP- /NOICONS /NORESTART"
+        sparkle:edSignature="IbRa038f3en9qZFDz9vvdMAJmFEoA4D8fCrcrMFQVhHY56dkYhxJs8Q2mvTSyEPyEriqaPlPPOCo6grT0l/EDg=="
+      />
     </item>
   </channel>
 </rss>
