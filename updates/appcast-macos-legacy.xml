@@ -4,24 +4,18 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     <channel>
         <title>Kontakt Library Manager</title>
         <item>
-            <title>0.2.7</title>
-            <pubDate>Mon, 24 Aug 2026 05:19:58 +0000</pubDate>
-            <sparkle:version>19</sparkle:version>
-            <sparkle:shortVersionString>0.2.7</sparkle:shortVersionString>
+            <title>0.2.8</title>
+            <pubDate>Tue, 25 Aug 2026 20:16:54 +0000</pubDate>
+            <sparkle:version>20</sparkle:version>
+            <sparkle:shortVersionString>0.2.8</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>10.15</sparkle:minimumSystemVersion>
-<description sparkle:format="plain-text"><![CDATA[
-- Improved Kontakt library detection on macOS and Windows while excluding unrelated products.
-- Added batch operations for adding, repairing, and removing libraries with a single administrator authorization.
-- Added multi-library repair with a preview and automatic exclusion of healthy libraries.
-- macOS now processes batch changes transactionally and can roll them back if an error occurs.
-- Windows now uses native operations for improved performance.
-- Classic-order errors no longer prevent libraries from being removed successfully.
-- Fixed multi-library additions on macOS and Windows so already registered libraries are skipped while the remaining selected libraries continue installing.
+                  <description sparkle:format="plain-text"><![CDATA[
+- Performance and security improvements.
 ]]></description>
-            <enclosure url="https://github.com/cloinse/klm/releases/download/v0.2.7/klm-macos-v0.2.7.dmg" length="21769539" type="application/octet-stream" sparkle:edSignature="kd6z682B8mbcv19/uzY74F5RWPO/Z/jbgx+zCRDOc2dEpJ48Gh+QVgNx8yyLqvFsjqsnihtQIen30D6cTctLCw=="></enclosure>
+<enclosure url="https://github.com/cloinse/klm/releases/download/v0.2.8/klm-macos-v0.2.8.dmg" length="21785721" type="application/octet-stream" sparkle:edSignature="cGLBf5XsNnMPj2qlOAKnDTW2N16C9UI/r+zKzKW/+4+Ro1zD666QMZWtnTKXn+aa3GG4fJfrAaM/bhmv1PtmCQ=="></enclosure>
         </item>
     </channel>
 </rss><!-- sparkle-signatures:
-edSignature: 0oiqvNFLxLqralKDVrFZuoruj03usT3SkWQMLknKfjeuvfo1kPbh3Qj/UdzwFB+hJ2HEKyEJ7eJrqNT20WHBBg==
-length: 1821
+edSignature: IlwKlElNlXciO6cGwznzZSSvMIkaZPgnF2nlcvjoUonAEAWbk3f5oTAfeY0D72ezLH+BOTiuWzxgI9GenHQDAQ==
+length: 1171
 -->
