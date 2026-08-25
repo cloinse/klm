@@ -97,21 +97,38 @@ For macOS, `KLM_SPARKLE_PRIVATE_KEY_FILE` defaults to
 `KLM_RELEASE_NOTES_PATH` can be used instead of the optional command-line
 argument.
 
+## Automated macOS GitHub publishing
+
+The `macos-catalina-legacy` Codemagic workflow publishes macOS releases from
+version tags. It creates the GitHub Release, uploads the DMG, SHA-256 file, ZIP,
+and signed appcast, then updates `updates/appcast-macos-legacy.xml` on `main`.
+The application keeps using the stable raw GitHub appcast URL.
+This automation intentionally applies only to macOS; Windows publishing uses
+its separate workflow.
+
+Configure a fine-grained GitHub token for `cloinse/klm` with repository
+`Contents: Read and write` permission. Add it to the Codemagic secret group
+`klm_secrets` with the name `GITHUB_TOKEN`; never commit it to the repository.
+Enable the repository webhook for tag pushes. The workflow accepts stable tags
+matching `vX.Y.Z` and skips GitHub publishing for manual builds.
+
 ## Publishing an update
 
-1. Increase the version and build number in `pubspec.yaml`.
-2. Run the `macos-catalina-legacy` Codemagic workflow.
-3. Download `klm-macos-vX.Y.Z.zip`. It contains one folder with exactly the
-   DMG, its SHA-256 file, and `appcast-macos-legacy.xml`.
-4. Publish the DMG and SHA-256 file in the matching GitHub Release.
-5. Copy the generated appcast to:
+1. Increase the version and build number in `pubspec.yaml` and update
+   `updates/release-notes.txt`.
+2. Commit and push the change to `main`.
+3. Create and push the matching tag, for example:
 
 ```text
-updates/appcast-macos-legacy.xml
+git tag v0.2.8
+git push origin v0.2.8
 ```
 
-Commit the generated appcast without editing it. Existing installations will
-then discover the new release through Sparkle.
+4. Codemagic builds the macOS package and publishes the GitHub Release. It also
+   commits the generated signed appcast to `updates/appcast-macos-legacy.xml`,
+   so existing installations discover the release without a manual copy.
+5. Verify the generated assets and appcast in GitHub before announcing the
+   release.
 
 ## Publishing a Windows update
 

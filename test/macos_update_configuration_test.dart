@@ -36,6 +36,9 @@ void main() {
       'tool/create_dmg_background.swift',
     ).readAsStringSync();
     final dmgSettings = File('tool/dmg_settings.py').readAsStringSync();
+    final publisher = File(
+      'tool/publish_github_release.dart',
+    ).readAsStringSync();
 
     expect(
       codemagic,
@@ -47,6 +50,12 @@ void main() {
     expect(codemagic, contains('dart run tool/generate_appcast.dart'));
     expect(codemagic, contains('--platform macos'));
     expect(codemagic, isNot(contains('tool/generate_macos_appcast.sh')));
+    expect(codemagic, contains('events:\n        - tag'));
+    expect(codemagic, contains('tag_patterns:'));
+    expect(codemagic, contains('tool/publish_github_release.dart'));
+    expect(publisher, contains('GITHUB_TOKEN'));
+    expect(publisher, contains('replaceReleaseAssets'));
+    expect(publisher, contains('updateRepositoryFile'));
     expect(packager, contains('Print :CFBundleShortVersionString'));
     expect(packager, contains('klm-macos-v\${KLM_VERSION}.dmg'));
     expect(background, contains('let height = 400'));

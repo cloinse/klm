@@ -21,6 +21,13 @@ workflows:
         - $HOME/.pub-cache
         - $HOME/Library/Caches/pip
 
+    triggering:
+      events:
+        - tag
+      tag_patterns:
+        - pattern: 'v+([0-9]).+([0-9]).+([0-9])'
+          include: true
+
     scripts:
       - name: Configure macOS 10.15 deployment target
         script: |
@@ -257,6 +264,25 @@ workflows:
           cd "$KLM_STAGING_DIRECTORY"
           /usr/bin/zip -r -0 "$KLM_ARCHIVE" "$KLM_PACKAGE_NAME"
           test -f "$KLM_ARCHIVE"
+
+      - name: Publish macOS release and appcast
+        script: |
+          set -euo pipefail
+          KLM_APP_PATH="build/macos/Build/Products/Release/${KLM_APP_NAME}.app"
+          KLM_VERSION="$(/usr/libexec/PlistBuddy -c \
+            'Print :CFBundleShortVersionString' \
+            "$KLM_APP_PATH/Contents/Info.plist")"
+          KLM_PACKAGE_NAME="klm-macos-v${KLM_VERSION}"
+          KLM_OUTPUT_DIRECTORY="build/macos-release/$KLM_PACKAGE_NAME"
+
+          dart run tool/publish_github_release.dart \
+            --version "$KLM_VERSION" \
+            --appcast "$KLM_OUTPUT_DIRECTORY/appcast-macos-legacy.xml" \
+            --repository-appcast-path updates/appcast-macos-legacy.xml \
+            --asset "$KLM_OUTPUT_DIRECTORY/$KLM_PACKAGE_NAME.dmg" \
+            --asset "$KLM_OUTPUT_DIRECTORY/$KLM_PACKAGE_NAME.dmg.sha256" \
+            --asset "$CM_BUILD_DIR/$KLM_PACKAGE_NAME.zip" \
+            --release-notes "$CM_BUILD_DIR/updates/release-notes.txt"
 
     artifacts:
       - klm-macos-v*.zip
