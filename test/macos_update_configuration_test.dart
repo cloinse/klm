@@ -69,6 +69,7 @@ void main() {
     expect(publisher, contains('GITHUB_TOKEN'));
     expect(publisher, contains('replaceReleaseAssets'));
     expect(publisher, contains('updateRepositoryFile'));
+    expect(publisher, contains("title: options.title ?? tag"));
     expect(packager, contains('Print :CFBundleShortVersionString'));
     expect(packager, contains('klm-macos-v\${KLM_VERSION}.dmg'));
     expect(background, contains('let height = 400'));
@@ -79,9 +80,11 @@ void main() {
     expect(
       github_publisher.formatGitHubReleaseNotes(
         '0.2.9',
-        'Performance and security improvements.',
+        '- Performance and security improvements.',
       ),
-      equals("What's new in v0.2.9?\n\nPerformance and security improvements."),
+      equals(
+        "**What's new in v0.2.9?**\n\n- Performance and security improvements.",
+      ),
     );
   });
 }

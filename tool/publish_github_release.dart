@@ -44,7 +44,7 @@ Future<void> main(List<String> arguments) async {
     try {
       final release = await client.ensureRelease(
         tag: tag,
-        title: options.title ?? 'Kontakt Library Manager $tag',
+        title: options.title ?? tag,
         notes: formatGitHubReleaseNotes(options.version, notes),
       );
       await client.replaceReleaseAssets(release.id, assets);
@@ -71,8 +71,8 @@ Future<void> main(List<String> arguments) async {
 String formatGitHubReleaseNotes(String version, String? notes) {
   final details = notes?.trim().isNotEmpty == true
       ? notes!.trim()
-      : 'Performance and security improvements.';
-  return "What's new in v$version?\n\n$details";
+      : '- Performance and security improvements.';
+  return "**What's new in v$version?**\n\n$details";
 }
 
 const _usage = r'''Usage:
