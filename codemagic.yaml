@@ -281,7 +281,6 @@ workflows:
             --repository-appcast-path updates/appcast-macos-legacy.xml \
             --asset "$KLM_OUTPUT_DIRECTORY/$KLM_PACKAGE_NAME.dmg" \
             --asset "$KLM_OUTPUT_DIRECTORY/$KLM_PACKAGE_NAME.dmg.sha256" \
-            --asset "$CM_BUILD_DIR/$KLM_PACKAGE_NAME.zip" \
             --release-notes "$CM_BUILD_DIR/updates/release-notes.txt"
 
     artifacts:

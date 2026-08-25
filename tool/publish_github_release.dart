@@ -35,7 +35,8 @@ Future<void> main(List<String> arguments) async {
 
     final notes = await _readOptionalFile(options.releaseNotesPath);
     final appcast = File(options.appcastPath);
-    final assets = <File>[appcast, ...options.assetPaths.map(File.new)];
+    await _validateFiles([appcast]);
+    final assets = options.assetPaths.map(File.new).toList();
     await _validateFiles(assets);
     _validateUniqueAssetNames(assets);
 
@@ -72,8 +73,8 @@ const _usage = r'''Usage:
     --version <version> \
     --appcast <generated-appcast.xml> \
     --repository-appcast-path updates/appcast-<platform>.xml \
-    --asset <installer-or-archive> \
-    [--asset <sha256-file>] \
+    --asset <installer> \
+    --asset <sha256-file> \
     [--release-notes updates/release-notes.txt] \
     [--title <release-title>]
 
@@ -81,6 +82,10 @@ Required environment variables on tag builds:
   CM_TAG          The tag being built, for example v0.2.8.
   GITHUB_TOKEN    Fine-grained token with Contents: write permission.
   GITHUB_REPOSITORY (optional, defaults to cloinse/klm).
+
+The appcast is committed to the repository path and is not uploaded as a
+GitHub Release asset. Release assets are limited to the installer and SHA-256
+file supplied with --asset.
 ''';
 
 class _Options {
@@ -157,8 +162,11 @@ class _Options {
         '--version, --appcast, and --repository-appcast-path are required.',
       );
     }
-    if (assetPaths.isEmpty) {
-      throw const FormatException('At least one --asset is required.');
+    if (assetPaths.length != 2 ||
+        assetPaths.where((path) => path.endsWith('.sha256')).length != 1) {
+      throw const FormatException(
+        'Exactly two --asset values are required: the installer and one .sha256 file.',
+      );
     }
     if (!RegExp(r'^\d+\.\d+\.\d+$').hasMatch(version)) {
       throw FormatException('Invalid release version: $version.');

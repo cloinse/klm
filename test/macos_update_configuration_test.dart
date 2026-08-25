@@ -53,6 +53,17 @@ void main() {
     expect(codemagic, contains('events:\n        - tag'));
     expect(codemagic, contains('tag_patterns:'));
     expect(codemagic, contains('tool/publish_github_release.dart'));
+    expect(
+      codemagic,
+      contains('--asset "\$KLM_OUTPUT_DIRECTORY/\$KLM_PACKAGE_NAME.dmg"'),
+    );
+    expect(
+      codemagic,
+      contains(
+        '--asset "\$KLM_OUTPUT_DIRECTORY/\$KLM_PACKAGE_NAME.dmg.sha256"',
+      ),
+    );
+    expect(codemagic, isNot(contains('--asset "\$CM_BUILD_DIR/')));
     expect(publisher, contains('GITHUB_TOKEN'));
     expect(publisher, contains('replaceReleaseAssets'));
     expect(publisher, contains('updateRepositoryFile'));

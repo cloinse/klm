@@ -100,9 +100,10 @@ argument.
 ## Automated macOS GitHub publishing
 
 The `macos-catalina-legacy` Codemagic workflow publishes macOS releases from
-version tags. It creates the GitHub Release, uploads the DMG, SHA-256 file, ZIP,
-and signed appcast, then updates `updates/appcast-macos-legacy.xml` on `main`.
-The application keeps using the stable raw GitHub appcast URL.
+version tags. It creates the GitHub Release with only the DMG and SHA-256 file,
+then updates the signed appcast at `updates/appcast-macos-legacy.xml` on
+`main`. The ZIP remains a Codemagic build artifact and is not uploaded to the
+GitHub Release. The application keeps using the stable raw GitHub appcast URL.
 This automation intentionally applies only to macOS; Windows publishing uses
 its separate workflow.
 
