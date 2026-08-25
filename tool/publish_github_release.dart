@@ -274,14 +274,16 @@ class _GitHubClient {
     if (existing.statusCode == HttpStatus.ok) {
       final data = _asMap(existing.json, 'GitHub release lookup');
       final id = _asInt(data['id'], 'GitHub release id');
+      final update = <String, Object>{'name': title, 'body': notes};
       if (data['draft'] == true) {
-        await _requestJson(
-          'PATCH',
-          '/releases/$id',
-          body: {'draft': false, 'name': title},
-          expected: {HttpStatus.ok},
-        );
+        update['draft'] = false;
       }
+      await _requestJson(
+        'PATCH',
+        '/releases/$id',
+        body: update,
+        expected: {HttpStatus.ok},
+      );
       stdout.writeln('Using existing GitHub release $tag.');
       return _Release(id: id);
     }

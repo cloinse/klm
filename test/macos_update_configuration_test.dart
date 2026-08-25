@@ -70,6 +70,7 @@ void main() {
     expect(publisher, contains('replaceReleaseAssets'));
     expect(publisher, contains('updateRepositoryFile'));
     expect(publisher, contains("title: options.title ?? tag"));
+    expect(publisher, contains("'body': notes"));
     expect(packager, contains('Print :CFBundleShortVersionString'));
     expect(packager, contains('klm-macos-v\${KLM_VERSION}.dmg'));
     expect(background, contains('let height = 400'));
