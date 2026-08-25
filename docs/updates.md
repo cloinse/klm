@@ -104,6 +104,9 @@ version tags. It creates the GitHub Release with only the DMG and SHA-256 file,
 then updates the signed appcast at `updates/appcast-macos-legacy.xml` on
 `main`. The ZIP remains a Codemagic build artifact and is not uploaded to the
 GitHub Release. The application keeps using the stable raw GitHub appcast URL.
+The Release body is generated with a `What's new in vX.Y.Z?` heading followed
+by the contents of `updates/release-notes.txt`; the notes file remains unchanged
+so the same text continues to feed the in-app update dialog and appcast.
 This automation intentionally applies only to macOS; Windows publishing uses
 its separate workflow.
 

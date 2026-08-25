@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import '../tool/publish_github_release.dart' as github_publisher;
+
 void main() {
   test('Sparkle uses an install-only user driver on macOS', () {
     final updateBridge = File(
@@ -71,5 +73,15 @@ void main() {
     expect(packager, contains('klm-macos-v\${KLM_VERSION}.dmg'));
     expect(background, contains('let height = 400'));
     expect(dmgSettings, contains('window_rect = ((120, 120), (660, 400))'));
+  });
+
+  test("GitHub release notes include the versioned What's new heading", () {
+    expect(
+      github_publisher.formatGitHubReleaseNotes(
+        '0.2.9',
+        'Performance and security improvements.',
+      ),
+      equals("What's new in v0.2.9?\n\nPerformance and security improvements."),
+    );
   });
 }
