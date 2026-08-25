@@ -4,12 +4,18 @@ set -euo pipefail
 
 KLM_APP_NAME="${KLM_APP_NAME:-Kontakt Library Manager}"
 KLM_APP_PATH="${1:-build/macos/Build/Products/Release/${KLM_APP_NAME}.app}"
-KLM_DMG_PATH="${2:-build/distribution/Kontakt-Library-Manager.dmg}"
+KLM_DMG_PATH="${2:-}"
 KLM_TOOL_DIRECTORY="$(CDPATH= cd -- "$(/usr/bin/dirname "$0")" && /bin/pwd)"
 
 test -d "$KLM_APP_PATH"
 KLM_APP_PARENT="$(CDPATH= cd -- "$(/usr/bin/dirname "$KLM_APP_PATH")" && /bin/pwd)"
 KLM_APP_PATH="$KLM_APP_PARENT/$(/usr/bin/basename "$KLM_APP_PATH")"
+if test -z "$KLM_DMG_PATH"; then
+  KLM_VERSION="$(/usr/libexec/PlistBuddy -c \
+    'Print :CFBundleShortVersionString' \
+    "$KLM_APP_PATH/Contents/Info.plist")"
+  KLM_DMG_PATH="build/distribution/klm-macos-v${KLM_VERSION}.dmg"
+fi
 if test "${KLM_PREPARE_APP:-true}" = true; then
   "$KLM_TOOL_DIRECTORY/prepare_adhoc_sparkle.sh" "$KLM_APP_PATH"
 fi

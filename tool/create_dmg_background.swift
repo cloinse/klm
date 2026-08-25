@@ -10,7 +10,7 @@ guard arguments.count == 2 else {
 }
 
 let width = 660
-let height = 420
+let height = 400
 
 guard let bitmap = NSBitmapImageRep(
   bitmapDataPlanes: nil,
@@ -58,16 +58,29 @@ shadow.shadowOffset = NSSize(width: 0, height: -3)
 shadow.set()
 
 let arrow = NSBezierPath()
-arrow.move(to: NSPoint(x: 264, y: 190))
-arrow.line(to: NSPoint(x: 346, y: 190))
-arrow.line(to: NSPoint(x: 346, y: 157))
-arrow.line(to: NSPoint(x: 407, y: 210))
-arrow.line(to: NSPoint(x: 346, y: 263))
+arrow.move(to: NSPoint(x: 264, y: 174))
+arrow.line(to: NSPoint(x: 346, y: 174))
+arrow.line(to: NSPoint(x: 346, y: 150))
+arrow.line(to: NSPoint(x: 407, y: 190))
 arrow.line(to: NSPoint(x: 346, y: 230))
-arrow.line(to: NSPoint(x: 264, y: 230))
+arrow.line(to: NSPoint(x: 346, y: 206))
+arrow.line(to: NSPoint(x: 264, y: 206))
 arrow.close()
 NSColor(calibratedRed: 0.96, green: 0.65, blue: 0.18, alpha: 1).setFill()
 arrow.fill()
+
+let instruction = "To use, please install KLM in the Applications folder"
+let instructionStyle = NSMutableParagraphStyle()
+instructionStyle.alignment = .center
+let instructionAttributes: [NSAttributedString.Key: Any] = [
+  .font: NSFont.systemFont(ofSize: 16, weight: .medium),
+  .foregroundColor: NSColor(calibratedWhite: 0.22, alpha: 0.88),
+  .paragraphStyle: instructionStyle,
+]
+instruction.draw(
+  in: NSRect(x: 52, y: 292, width: 556, height: 28),
+  withAttributes: instructionAttributes
+)
 
 NSGraphicsContext.restoreGraphicsState()
 

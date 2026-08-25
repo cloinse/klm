@@ -31,6 +31,11 @@ void main() {
 
   test('Codemagic packages exactly three macOS release files in one ZIP', () {
     final codemagic = File('codemagic.yaml').readAsStringSync();
+    final packager = File('tool/package_macos_dmg.sh').readAsStringSync();
+    final background = File(
+      'tool/create_dmg_background.swift',
+    ).readAsStringSync();
+    final dmgSettings = File('tool/dmg_settings.py').readAsStringSync();
 
     expect(
       codemagic,
@@ -39,5 +44,12 @@ void main() {
     expect(codemagic, contains('test "\$KLM_FILE_COUNT" -eq 3'));
     expect(codemagic, contains('- klm-macos-v*.zip'));
     expect(codemagic, isNot(contains('- build/legacy/*.dmg')));
+    expect(codemagic, contains('dart run tool/generate_appcast.dart'));
+    expect(codemagic, contains('--platform macos'));
+    expect(codemagic, isNot(contains('tool/generate_macos_appcast.sh')));
+    expect(packager, contains('Print :CFBundleShortVersionString'));
+    expect(packager, contains('klm-macos-v\${KLM_VERSION}.dmg'));
+    expect(background, contains('let height = 400'));
+    expect(dmgSettings, contains('window_rect = ((120, 120), (660, 400))'));
   });
 }

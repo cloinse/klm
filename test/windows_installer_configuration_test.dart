@@ -16,6 +16,15 @@ void main() {
     expect(runEntry, isNot(contains('skipifsilent')));
   });
 
+  test('Windows upgrades remove the retired interpreter helper', () {
+    final installer = File(
+      'windows/installer/kontakt_library_manager.iss',
+    ).readAsStringSync();
+
+    expect(installer, contains('[InstallDelete]'));
+    expect(installer, contains('Name: "{app}\\KontaktLibraryHelper.ps1"'));
+  });
+
   test('WinSparkle installs only after the shared confirmation dialog', () {
     final updateBridge = File(
       'windows/runner/update_bridge.cpp',

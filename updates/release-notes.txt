@@ -1,7 +1,1 @@
-- Improved Kontakt library detection on macOS and Windows while excluding unrelated products.
-- Added batch operations for adding, repairing, and removing libraries with a single administrator authorization.
-- Added multi-library repair with a preview and automatic exclusion of healthy libraries.
-- macOS now processes batch changes transactionally and can roll them back if an error occurs.
-- Windows now uses native operations for improved performance.
-- Classic-order errors no longer prevent libraries from being removed successfully.
-- Fixed multi-library additions on macOS and Windows so already registered libraries are skipped while the remaining selected libraries continue installing.
+- Performance and security improvements.

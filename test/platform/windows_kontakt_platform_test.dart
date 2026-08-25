@@ -21,15 +21,13 @@ void main() {
     final platform = _source(
       'lib/platform/windows/windows_kontakt_platform.dart',
     );
-    final helper = _source('windows/runner/KontaktLibraryHelper.ps1');
     final registryBridge = _source('windows/runner/registry_bridge.cpp');
 
     expect(
       platform,
       contains("invokeMethod<void>('writeClassicOrder', entries)"),
     );
-    expect(platform, contains("mode: 'classicOrder'"));
-    expect(platform, contains("temporaryDirectoryPrefix: 'klm-order-'"));
+    expect(platform, isNot(contains("mode: 'classicOrder'")));
     expect(platform, isNot(contains('_classicOrderUnsupported')));
     expect(
       registryBridge,
@@ -39,21 +37,6 @@ void main() {
     expect(registryBridge, contains('L"UserListIndex"'));
     expect(registryBridge, contains('L"browserLibsAZSort"'));
     expect(registryBridge, contains('RestoreRegistryBackup'));
-    expect(helper, contains("'inventory', 'mutation', 'classicOrder'"));
-    expect(helper, contains('Get-UserListIndexes'));
-    expect(helper, contains('\$record.visibility = \$parsedVisibility'));
-    expect(helper, contains('RegistryHive]::CurrentUser'));
-    expect(helper, contains('UserListIndex = \$entry.Index'));
-    expect(helper, contains('browserLibsAZSort = 0'));
-
-    expect(
-      helper,
-      contains(
-        "  } elseif (\$Mode -eq 'mutation') {\n"
-        "    if (-not (Test-IsAdministrator)) {",
-      ),
-    );
-    expect(helper, contains("  } else {\n    \$result = Invoke-ClassicOrder"));
   });
 
   test('standard inventory ignores plugin ProductHints records', () async {
@@ -139,48 +122,89 @@ void main() {
     },
   );
 
-  test('Windows helper supports transactional mutation batches', () {
-    final helper = _source('windows/runner/KontaktLibraryHelper.ps1');
+  test(
+    'standard inventory reports native bridge failures without fallback',
+    () async {
+      const channel = MethodChannel(
+        'com.juanayala.kontaktLibraryManager/windows_registry',
+      );
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        throw PlatformException(code: 'registry_read_failed');
+      });
 
-    expect(helper, contains("Get-ObjectProperty \$request 'operations'"));
+      final root = await Directory.systemTemp.createTemp('klm-registry-error-');
+      addTearDown(() => root.delete(recursive: true));
+      final serviceCenter = await Directory('${root.path}/service').create();
+      final installed = await Directory('${root.path}/installed').create();
+      await File('${serviceCenter.path}/Native Library.xml').writeAsString('''
+<ProductHints><Product>
+  <Name>Native Library</Name><RegKey>Native Library</RegKey><SNPID>N01</SNPID>
+  <Type>Content</Type>
+</Product></ProductHints>
+''');
+
+      final snapshot = await WindowsKontaktPlatform(
+        serviceCenterPath: serviceCenter.path,
+        installedProductsPath: installed.path,
+      ).scanLibraries();
+
+      expect(snapshot.libraries.map((library) => library.name), [
+        'Native Library',
+      ]);
+      expect(
+        snapshot.diagnostics.map((diagnostic) => diagnostic.code),
+        contains('windows_registry_native_failed'),
+      );
+    },
+  );
+
+  test('Windows native helper supports transactional mutation batches', () {
+    final nativeMutation = _source('windows/runner/native_mutation.cpp');
+
+    expect(nativeMutation, contains('kMaximumOperations = 1000'));
     expect(
-      helper,
-      contains(
-        "  if (\$null -eq \$rawOperations) {\n"
-        "    \$requests = @(\$request)\n"
-        "  } else {\n"
-        "    \$requests = @(\$rawOperations)\n"
-        "  }\n"
-        "  if (\$requests.Count -lt 1",
-      ),
+      nativeMutation,
+      contains('request->operations.reserve(operation_count)'),
+    );
+    expect(nativeMutation, contains('file_targets'));
+    expect(nativeMutation, contains('registry_targets'));
+    expect(
+      nativeMutation,
+      contains('The mutation contains conflicting file targets.'),
     );
     expect(
-      helper,
-      isNot(contains('\$requests = if (\$null -eq \$rawOperations)')),
+      nativeMutation,
+      contains('The mutation contains conflicting registry targets.'),
     );
-    expect(helper, contains('New-MutationPlan'));
-    expect(helper, contains("operation = 'batch'"));
-    expect(helper, contains('Conflicting mutation targets.'));
   });
 
-  test('Windows launches PowerShell helpers with hidden windows', () {
+  test('Windows runtime does not include a PowerShell fallback', () {
     final platform = _source(
       'lib/platform/windows/windows_kontakt_platform.dart',
     );
-    final helper = _source('windows/runner/KontaktLibraryHelper.ps1');
+    final elevator = _source('windows/runner/elevated_process_runner.cpp');
+    final windowsCmake = _source('windows/CMakeLists.txt');
+    final appcastGenerator = _source('tool/generate_appcast.dart');
 
-    expect(platform, contains("'-WindowStyle',\n    'Hidden',"));
+    expect(platform, isNot(contains('powershell.exe')));
+    expect(platform, isNot(contains('KontaktLibraryHelper.ps1')));
+    expect(elevator, isNot(contains('powershell.exe')));
+    expect(elevator, isNot(contains('KontaktLibraryHelper.ps1')));
+    expect(windowsCmake, isNot(contains('KontaktLibraryHelper.ps1')));
+    expect(appcastGenerator, isNot(contains('powershell')));
+    expect(appcastGenerator, contains('--platform'));
     expect(
-      RegExp(
-        r"Process\.run\('powershell\.exe', \[\s*\.\.\._hiddenPowerShellArguments,",
-      ).allMatches(platform),
-      hasLength(2),
+      File('windows/runner/KontaktLibraryHelper.ps1').existsSync(),
+      isFalse,
     );
-    expect(helper, contains("'-WindowStyle Hidden'"));
-    expect(helper, contains('-WindowStyle Hidden -Wait -PassThru'));
+    expect(File('tool/generate_windows_appcast.ps1').existsSync(), isFalse);
+    expect(File('tool/generate_macos_appcast.sh').existsSync(), isFalse);
   });
 
-  test('Windows mutations skip the unelevated PowerShell bootstrap', () {
+  test('Windows mutations use the self-contained native elevator', () {
     final platform = _source(
       'lib/platform/windows/windows_kontakt_platform.dart',
     );
@@ -191,6 +215,7 @@ void main() {
     expect(platform, contains('KontaktLibraryElevator.exe'));
     expect(platform, contains("'--native-mutation'"));
     expect(platform, contains('WindowsNativeMutationCodec.encode(request)'));
+    expect(platform, contains("code: 'native_elevator_unavailable'"));
     expect(elevator, contains('execute_info.lpVerb = L"runas"'));
     expect(elevator, contains('L"--apply-native-mutation"'));
     expect(elevator, contains('RunNativeMutation(arguments[2]'));
@@ -198,7 +223,26 @@ void main() {
     expect(runnerCmake, contains('add_executable(kontakt_library_elevator'));
     expect(runnerCmake, contains('"native_mutation.cpp"'));
     expect(runnerCmake, contains('"bcrypt.lib"'));
+    expect(runnerCmake, contains('MSVC_RUNTIME_LIBRARY'));
     expect(windowsCmake, contains('install(TARGETS kontakt_library_elevator'));
+  });
+
+  test('Unified appcast generation stays native to Dart tooling', () {
+    final generator = _source('tool/generate_appcast.dart');
+
+    expect(generator, contains('WinSparkle could not sign the installer'));
+    expect(generator, contains('base64Decode(signature)'));
+    expect(generator, contains('Installer signature verification failed'));
+    expect(generator, contains('KLM_SPARKLE_PRIVATE_KEY'));
+    expect(generator, contains('Sparkle appcast generation'));
+    expect(generator, contains('sign_update'));
+    expect(generator, contains('Sparkle-\$_sparkleVersion.tar.xz'));
+    expect(
+      generator,
+      contains(
+        '1cb340cbbef04c6c0d162078610c25e2221031d794a3449d89f2f56f4df77c95',
+      ),
+    );
   });
 
   test(

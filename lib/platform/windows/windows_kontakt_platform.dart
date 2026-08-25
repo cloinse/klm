@@ -20,15 +20,6 @@ class WindowsKontaktPlatform implements KontaktPlatform {
   static const _registryChannel = MethodChannel(
     'com.juanayala.kontaktLibraryManager/windows_registry',
   );
-  static const _hiddenPowerShellArguments = <String>[
-    '-NoLogo',
-    '-NoProfile',
-    '-NonInteractive',
-    '-WindowStyle',
-    'Hidden',
-    '-ExecutionPolicy',
-    'Bypass',
-  ];
 
   WindowsKontaktPlatform({
     ProductHintsParser parser = const ProductHintsParser(),
@@ -291,74 +282,45 @@ class WindowsKontaktPlatform implements KontaktPlatform {
         source: 'native',
         elapsed: stopwatch.elapsed,
       );
-    } on MissingPluginException {
-      final fallback = await _readRegistryRecordsWithPowerShell();
-      stopwatch.stop();
-      return fallback.withElapsed(stopwatch.elapsed);
-    } on PlatformException {
-      final fallback = await _readRegistryRecordsWithPowerShell();
-      stopwatch.stop();
-      return fallback.withElapsed(stopwatch.elapsed);
+    } on MissingPluginException catch (error) {
+      return _nativeRegistryReadFailure(
+        error,
+        stopwatch,
+        code: 'windows_registry_bridge_unavailable',
+        message:
+            'El componente nativo de Windows no está disponible. Reinstala o actualiza Kontakt Library Manager.',
+      );
+    } on PlatformException catch (error) {
+      return _nativeRegistryReadFailure(
+        error,
+        stopwatch,
+        code: 'windows_registry_native_failed',
+        message:
+            'No se pudo leer el Registro de Native Instruments con el componente nativo.',
+      );
     }
   }
 
-  Future<_RegistryReadResult> _readRegistryRecordsWithPowerShell() async {
-    final helper = _helperFile;
-    if (!await helper.exists()) {
-      return const _RegistryReadResult(
-        source: 'powershell',
-        diagnostics: <InventoryDiagnostic>[
-          InventoryDiagnostic(
-            code: 'windows_helper_missing',
-            title: 'Componente de Windows no encontrado',
-            message: 'No se pudo leer el Registro de Native Instruments.',
-            severity: IssueSeverity.warning,
-          ),
-        ],
-      );
-    }
-
-    final temporaryDirectory = await Directory.systemTemp.createTemp(
-      'klm-registry-',
+  _RegistryReadResult _nativeRegistryReadFailure(
+    Object error,
+    Stopwatch stopwatch, {
+    required String code,
+    required String message,
+  }) {
+    stopwatch.stop();
+    return _RegistryReadResult(
+      source: 'native',
+      elapsed: stopwatch.elapsed,
+      diagnostics: <InventoryDiagnostic>[
+        InventoryDiagnostic(
+          code: code,
+          title: 'No se pudo leer el Registro',
+          message: message,
+          severity: IssueSeverity.warning,
+          detail: error.toString(),
+        ),
+      ],
     );
-    final responseFile = File(
-      '${temporaryDirectory.path}${Platform.pathSeparator}response.json',
-    );
-    try {
-      final process = await Process.run('powershell.exe', [
-        ..._hiddenPowerShellArguments,
-        '-File',
-        helper.path,
-        '-Mode',
-        'inventory',
-        '-ResponsePath',
-        responseFile.path,
-      ]);
-      if (process.exitCode != 0 || !await responseFile.exists()) {
-        throw const FormatException('Registry helper failed.');
-      }
-      final decoded = jsonDecode(await responseFile.readAsString());
-      final rawRecords = decoded is List ? decoded : <Object?>[decoded];
-      return _RegistryReadResult(
-        records: _decodeRegistryRecords(rawRecords.cast<Object?>()),
-        source: 'powershell',
-      );
-    } catch (error) {
-      return _RegistryReadResult(
-        source: 'powershell',
-        diagnostics: <InventoryDiagnostic>[
-          InventoryDiagnostic(
-            code: 'windows_registry_failed',
-            title: 'No se pudo leer el Registro',
-            message: error.toString(),
-            severity: IssueSeverity.warning,
-            detail: error.toString(),
-          ),
-        ],
-      );
-    } finally {
-      await temporaryDirectory.delete(recursive: true);
-    }
   }
 
   List<Map<String, Object?>> _decodeRegistryRecords(List<Object?> rawRecords) {
@@ -463,14 +425,12 @@ class WindowsKontaktPlatform implements KontaktPlatform {
       await _registryChannel.invokeMethod<void>('writeClassicOrder', entries);
       return;
     } on MissingPluginException {
-      // Older runners continue to use the PowerShell implementation.
+      throw PlatformException(
+        code: 'native_registry_bridge_unavailable',
+        message:
+            'The native Windows registry component is unavailable. Reinstall or update Kontakt Library Manager.',
+      );
     }
-
-    await _executeHelperRequest(
-      mode: 'classicOrder',
-      temporaryDirectoryPrefix: 'klm-order-',
-      request: {'version': 1, 'entries': entries},
-    );
   }
 
   @override
@@ -506,7 +466,7 @@ class WindowsKontaktPlatform implements KontaktPlatform {
 
   @override
   Future<PrivilegedHelperStatus> privilegedHelperStatus() async =>
-      _portableMode || await _helperFile.exists()
+      _portableMode || await _elevatorFile.exists()
       ? PrivilegedHelperStatus.enabled
       : PrivilegedHelperStatus.unavailable;
 
@@ -610,11 +570,6 @@ class WindowsKontaktPlatform implements KontaktPlatform {
     );
   }
 
-  File get _helperFile => File(
-    '${File(Platform.resolvedExecutable).parent.path}'
-    '${Platform.pathSeparator}KontaktLibraryHelper.ps1',
-  );
-
   File get _elevatorFile => File(
     '${File(Platform.resolvedExecutable).parent.path}'
     '${Platform.pathSeparator}KontaktLibraryElevator.exe',
@@ -623,8 +578,7 @@ class WindowsKontaktPlatform implements KontaktPlatform {
   Future<KontaktMutationResult> _executeMutation(
     Map<String, Object> request,
   ) async {
-    final response = await _executeHelperRequest(
-      mode: 'mutation',
+    final response = await _executeNativeMutationRequest(
       temporaryDirectoryPrefix: 'klm-mutation-',
       request: request,
     );
@@ -634,32 +588,28 @@ class WindowsKontaktPlatform implements KontaktPlatform {
   Future<List<KontaktMutationResult>> _executeMutations(
     List<Map<String, Object>> operations,
   ) async {
-    final response = await _executeHelperRequest(
-      mode: 'mutation',
+    final response = await _executeNativeMutationRequest(
       temporaryDirectoryPrefix: 'klm-mutation-batch-',
       request: KontaktMutationRequest.batch(operations).payload,
     );
     return KontaktMutationResult.listFromMap(response);
   }
 
-  Future<Map<String, dynamic>> _executeHelperRequest({
-    required String mode,
+  Future<Map<String, dynamic>> _executeNativeMutationRequest({
     required String temporaryDirectoryPrefix,
     required Map<String, Object> request,
   }) async {
-    final helper = _helperFile;
-    if (!await helper.exists()) {
+    final elevator = _elevatorFile;
+    if (!await elevator.exists()) {
       throw PlatformException(
-        code: 'helper_unavailable',
-        message: 'The Windows helper is missing.',
+        code: 'native_elevator_unavailable',
+        message:
+            'The native Windows library helper is missing. Reinstall or update Kontakt Library Manager.',
       );
     }
 
     final temporaryDirectory = await Directory.systemTemp.createTemp(
       temporaryDirectoryPrefix,
-    );
-    final requestFile = File(
-      '${temporaryDirectory.path}${Platform.pathSeparator}request.json',
     );
     final nativeRequestFile = File(
       '${temporaryDirectory.path}${Platform.pathSeparator}request.bin',
@@ -668,50 +618,31 @@ class WindowsKontaktPlatform implements KontaktPlatform {
       '${temporaryDirectory.path}${Platform.pathSeparator}response.json',
     );
     try {
-      final elevator = _elevatorFile;
-      final useNativeMutation = mode == 'mutation' && await elevator.exists();
+      late final List<int> nativeRequestBytes;
+      try {
+        nativeRequestBytes = WindowsNativeMutationCodec.encode(request);
+      } on FormatException catch (error) {
+        throw PlatformException(
+          code: 'mutation_request_invalid',
+          message: error.message,
+        );
+      }
+      await nativeRequestFile.writeAsBytes(nativeRequestBytes, flush: true);
+      final nativeDigest = sha256.convert(nativeRequestBytes).toString();
       late final ProcessResult process;
-      if (useNativeMutation) {
-        late final List<int> nativeRequestBytes;
-        try {
-          nativeRequestBytes = WindowsNativeMutationCodec.encode(request);
-        } on FormatException catch (error) {
-          throw PlatformException(
-            code: 'mutation_request_invalid',
-            message: error.message,
-          );
-        }
-        await nativeRequestFile.writeAsBytes(nativeRequestBytes, flush: true);
-        final nativeDigest = sha256.convert(nativeRequestBytes).toString();
+      try {
         process = await Process.run(elevator.path, [
           '--native-mutation',
           nativeRequestFile.path,
           nativeDigest,
           responseFile.path,
         ]);
-      } else {
-        final requestBytes = utf8.encode(jsonEncode(request));
-        if (requestBytes.length > 2500000) {
-          throw PlatformException(
-            code: 'mutation_request_too_large',
-            message: 'The mutation request is too large.',
-          );
-        }
-        await requestFile.writeAsBytes(requestBytes, flush: true);
-        final digest = sha256.convert(requestBytes).toString();
-        process = await Process.run('powershell.exe', [
-          ..._hiddenPowerShellArguments,
-          '-File',
-          helper.path,
-          '-Mode',
-          mode,
-          '-RequestPath',
-          requestFile.path,
-          '-RequestSha256',
-          digest,
-          '-ResponsePath',
-          responseFile.path,
-        ]);
+      } on ProcessException catch (error) {
+        throw PlatformException(
+          code: 'native_elevator_launch_failed',
+          message: error.message,
+          details: error.toString(),
+        );
       }
 
       Map<String, dynamic>? response;
@@ -766,11 +697,4 @@ class _RegistryReadResult {
   final List<InventoryDiagnostic> diagnostics;
   final String source;
   final Duration elapsed;
-
-  _RegistryReadResult withElapsed(Duration value) => _RegistryReadResult(
-    records: records,
-    diagnostics: diagnostics,
-    source: source,
-    elapsed: value,
-  );
 }

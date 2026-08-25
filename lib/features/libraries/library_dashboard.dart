@@ -366,26 +366,33 @@ class _Sidebar extends StatelessWidget {
                 ),
                 if (!compact) ...[
                   const SizedBox(width: 11),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'KLM',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 17,
-                          letterSpacing: 1,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'KLM',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 17,
+                            letterSpacing: 1,
+                          ),
                         ),
-                      ),
-                      Text(
-                        'LIBRARY MANAGER',
-                        style: TextStyle(
-                          color: context.klmColors.tertiaryText,
-                          fontSize: 8,
-                          letterSpacing: 1.1,
+                        FittedBox(
+                          alignment: Alignment.centerLeft,
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'KONTAKT LIBRARY MANAGER',
+                            maxLines: 1,
+                            style: TextStyle(
+                              color: context.klmColors.tertiaryText,
+                              fontSize: 8,
+                              letterSpacing: 0.7,
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
               ],

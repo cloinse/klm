@@ -226,9 +226,10 @@ workflows:
           else
             unset KLM_RELEASE_NOTES_PATH
           fi
-          tool/generate_macos_appcast.sh \
-            "$KLM_OUTPUT_DIRECTORY" \
-            "$KLM_OUTPUT_DIRECTORY/appcast-macos-legacy.xml"
+          dart run tool/generate_appcast.dart \
+            --platform macos \
+            --archives-directory "$KLM_OUTPUT_DIRECTORY" \
+            --output "$KLM_OUTPUT_DIRECTORY/appcast-macos-legacy.xml"
 
       - name: Package macOS release archive
         script: |

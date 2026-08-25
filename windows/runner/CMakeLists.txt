@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.15)
 project(runner LANGUAGES CXX)
 
 # Define the application target. To change its name, change BINARY_NAME in the
@@ -25,6 +25,14 @@ add_executable(kontakt_library_elevator WIN32
 set_target_properties(kontakt_library_elevator PROPERTIES
   OUTPUT_NAME "KontaktLibraryElevator"
 )
+# Keep the one-shot elevated helper self-contained on clean Windows systems.
+# The Flutter runner has its own deployment requirements; this helper does not
+# require the Visual C++ redistributable or an external interpreter.
+if(MSVC)
+  set_property(TARGET kontakt_library_elevator PROPERTY
+    MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+  )
+endif()
 apply_standard_settings(kontakt_library_elevator)
 target_compile_definitions(kontakt_library_elevator PRIVATE
   "NOMINMAX"
