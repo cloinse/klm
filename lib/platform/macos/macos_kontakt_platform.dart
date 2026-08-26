@@ -52,34 +52,38 @@ class MacOSKontaktPlatform implements KontaktPlatform {
   Future<InventorySnapshot> scanLibraries() async {
     final assembler = InventoryAssembler();
     final diagnostics = <InventoryDiagnostic>[];
-    final knownRegKeys = <String>{};
-    final excludedRegKeys = <String>{};
+    final knownIdentities = <String>{};
+    final excludedIdentities = <String>{};
 
     await _readServiceCenter(
       assembler,
       diagnostics,
-      knownRegKeys,
-      excludedRegKeys,
+      knownIdentities,
+      excludedIdentities,
     );
     await _readPreferences(
       assembler,
       diagnostics,
-      knownRegKeys,
-      excludedRegKeys,
+      knownIdentities,
+      excludedIdentities,
     );
     await _readInstalledProducts(
       assembler,
       diagnostics,
-      knownRegKeys,
-      excludedRegKeys,
+      knownIdentities,
+      excludedIdentities,
     );
     await _readUserListIndexes(assembler);
 
-    final libraries = _validator.validate(assembler.build())
-      ..sort(
-        (left, right) =>
-            left.name.toLowerCase().compareTo(right.name.toLowerCase()),
-      );
+    final libraries =
+        await _validator.validateAsync(
+            assembler.build(),
+            pathProbe: _probeContentPath,
+          )
+          ..sort(
+            (left, right) =>
+                left.name.toLowerCase().compareTo(right.name.toLowerCase()),
+          );
     return InventorySnapshot(
       libraries: libraries,
       diagnostics: diagnostics,
@@ -90,8 +94,8 @@ class MacOSKontaktPlatform implements KontaktPlatform {
   Future<void> _readServiceCenter(
     InventoryAssembler assembler,
     List<InventoryDiagnostic> diagnostics,
-    Set<String> knownRegKeys,
-    Set<String> excludedRegKeys,
+    Set<String> knownIdentities,
+    Set<String> excludedIdentities,
   ) async {
     final directory = Directory(serviceCenterPath);
     if (!await directory.exists()) {
@@ -113,12 +117,20 @@ class MacOSKontaktPlatform implements KontaktPlatform {
       try {
         final metadata = _parser.parseBytes(await entity.readAsBytes());
         if (!metadata.isKontaktLibraryMetadata) {
-          excludedRegKeys
-            ..add(metadata.regKey.toLowerCase())
-            ..add(metadata.name.toLowerCase());
+          _addIdentities(
+            excludedIdentities,
+            metadata.name,
+            metadata.regKey,
+            metadata.snpid,
+          );
           continue;
         }
-        knownRegKeys.add(metadata.regKey.toLowerCase());
+        _addIdentities(
+          knownIdentities,
+          metadata.name,
+          metadata.regKey,
+          metadata.snpid,
+        );
         assembler.add(
           name: metadata.name,
           regKey: metadata.regKey,
@@ -136,8 +148,8 @@ class MacOSKontaktPlatform implements KontaktPlatform {
   Future<void> _readInstalledProducts(
     InventoryAssembler assembler,
     List<InventoryDiagnostic> diagnostics,
-    Set<String> knownRegKeys,
-    Set<String> excludedRegKeys,
+    Set<String> knownIdentities,
+    Set<String> excludedIdentities,
   ) async {
     final directory = Directory(installedProductsPath);
     if (!await directory.exists()) {
@@ -167,21 +179,21 @@ class MacOSKontaktPlatform implements KontaktPlatform {
           'contentDir',
           'content_path',
         ]);
-        final identity = (regKey ?? name).toLowerCase();
-        if (excludedRegKeys.contains(identity) ||
-            excludedRegKeys.contains(name.toLowerCase())) {
+        final identities = _identities(name, regKey, snpid);
+        if (_intersects(excludedIdentities, identities)) {
           continue;
         }
-        if (!knownRegKeys.contains(identity) &&
+        if (!_intersects(knownIdentities, identities) &&
             (snpid == null || contentPath == null)) {
           continue;
         }
-        knownRegKeys.add(identity);
+        knownIdentities.addAll(identities);
         assembler.add(
           name: name,
           regKey: regKey,
           snpid: snpid,
           contentPath: contentPath,
+          preferContentPath: true,
           source: RegistrationSource.installedProducts,
         );
       } catch (error) {
@@ -201,8 +213,8 @@ class MacOSKontaktPlatform implements KontaktPlatform {
   Future<void> _readPreferences(
     InventoryAssembler assembler,
     List<InventoryDiagnostic> diagnostics,
-    Set<String> knownRegKeys,
-    Set<String> excludedRegKeys,
+    Set<String> knownIdentities,
+    Set<String> excludedIdentities,
   ) async {
     final directory = Directory(preferencesPath);
     if (!await directory.exists()) return;
@@ -238,17 +250,16 @@ class MacOSKontaktPlatform implements KontaktPlatform {
           'Visibility',
           'visibility',
         ]);
-        final identity = (regKey ?? name).toLowerCase();
-        if (excludedRegKeys.contains(identity) ||
-            excludedRegKeys.contains(name.toLowerCase())) {
+        final identities = _identities(name, regKey, snpid);
+        if (_intersects(excludedIdentities, identities)) {
           continue;
         }
-        if (!knownRegKeys.contains(identity) &&
+        if (!_intersects(knownIdentities, identities) &&
             contentPath == null &&
             visibility == null) {
           continue;
         }
-        knownRegKeys.add(identity);
+        knownIdentities.addAll(identities);
         assembler.add(
           name: name,
           regKey: regKey,
@@ -321,6 +332,41 @@ class MacOSKontaktPlatform implements KontaktPlatform {
       if (value is String) return int.tryParse(value.trim());
     }
     return null;
+  }
+
+  Set<String> _identities(String name, String? regKey, String? snpid) {
+    return {name, ?regKey, ?snpid}
+        .map((value) => value.trim().toLowerCase())
+        .where((value) => value.isNotEmpty)
+        .toSet();
+  }
+
+  void _addIdentities(
+    Set<String> destination,
+    String name,
+    String? regKey,
+    String? snpid,
+  ) {
+    destination.addAll(_identities(name, regKey, snpid));
+  }
+
+  bool _intersects(Set<String> left, Set<String> right) {
+    return right.any(left.contains);
+  }
+
+  Future<ContentPathAccess> _probeContentPath(String path) async {
+    try {
+      await Directory(path).list(followLinks: false).take(1).drain<void>();
+      return ContentPathAccess.available;
+    } on FileSystemException catch (error) {
+      return switch (error.osError?.errorCode) {
+        1 || 13 => ContentPathAccess.permissionDenied,
+        2 || 20 => ContentPathAccess.missing,
+        _ => ContentPathAccess.unavailable,
+      };
+    } catch (_) {
+      return ContentPathAccess.unavailable;
+    }
   }
 
   String _fileName(String path) => path.split('/').last;

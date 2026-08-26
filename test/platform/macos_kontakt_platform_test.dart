@@ -20,11 +20,21 @@ void main() {
       '${root.path}/user-preferences',
     ).create();
     final content = await Directory('${root.path}/content').create();
+    final staleContentPath = '${root.path}/old-content-location';
 
     await File('${serviceCenter.path}/Analog Dreams.xml').writeAsString('''
 <ProductHints><Product>
   <Name>Analog Dreams</Name><RegKey>Analog Dreams</RegKey><SNPID>ABC</SNPID>
   <Type>Content</Type>
+</Product></ProductHints>
+''');
+    await File(
+      '${serviceCenter.path}/Reaktor Factory Library.xml',
+    ).writeAsString('''
+<ProductHints><Product>
+  <Name>Reaktor Factory Library</Name><RegKey>Reaktor Factory Library</RegKey><SNPID>R01</SNPID>
+  <Type>Content</Type><PoweredBy>Reaktor</PoweredBy>
+  <Relevance><Application>Reaktor</Application></Relevance>
 </Product></ProductHints>
 ''');
     await File('${serviceCenter.path}/Arturia Plugin.xml').writeAsString('''
@@ -40,6 +50,9 @@ void main() {
     await File('${installed.path}/Arturia Plugin.json').writeAsString(
       '{"RegKey":"Arturia Plugin","SNPID":"A01","ContentDir":"${content.path}"}',
     );
+    await File('${installed.path}/Reaktor Factory Library.json').writeAsString(
+      '{"RegKey":"Reaktor Factory Library","SNPID":"R01","ContentDir":"${content.path}"}',
+    );
     await File(
       '${preferences.path}/com.native-instruments.Analog Dreams.plist',
     ).writeAsString('''
@@ -49,6 +62,18 @@ void main() {
   <key>Name</key><string>Analog Dreams</string>
   <key>RegKey</key><string>Analog Dreams</string>
   <key>SNPID</key><string>ABC</string>
+  <key>ContentDir</key><string>$staleContentPath</string>
+  <key>Visibility</key><integer>3</integer>
+</dict></plist>
+''');
+    await File(
+      '${preferences.path}/com.native-instruments.Reaktor Factory Library.plist',
+    ).writeAsString('''
+<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+  <key>Name</key><string>Reaktor Factory Library</string>
+  <key>RegKey</key><string>Reaktor Factory Library</string>
+  <key>SNPID</key><string>R01</string>
   <key>ContentDir</key><string>${content.path}</string>
   <key>Visibility</key><integer>3</integer>
 </dict></plist>

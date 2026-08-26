@@ -39,6 +39,13 @@ void main() {
     expect(registryBridge, contains('RestoreRegistryBackup'));
   });
 
+  test('Windows registry bridge exposes access-denied diagnostics', () {
+    final registryBridge = _source('windows/runner/registry_bridge.cpp');
+
+    expect(registryBridge, contains('registry_access_denied'));
+    expect(registryBridge, contains('ERROR_ACCESS_DENIED'));
+  });
+
   test('standard inventory ignores plugin ProductHints records', () async {
     final root = await Directory.systemTemp.createTemp('klm-windows-scan-');
     addTearDown(() => root.delete(recursive: true));
@@ -123,6 +130,57 @@ void main() {
   );
 
   test(
+    'standard inventory lets the Registry replace a stale JSON path',
+    () async {
+      const channel = MethodChannel(
+        'com.juanayala.kontaktLibraryManager/windows_registry',
+      );
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+      final root = await Directory.systemTemp.createTemp('klm-windows-path-');
+      addTearDown(() => root.delete(recursive: true));
+      final serviceCenter = await Directory('${root.path}/service').create();
+      final installed = await Directory('${root.path}/installed').create();
+      final staleContent = await Directory('${root.path}/stale').create();
+      final currentContent = await Directory('${root.path}/current').create();
+      await File('${serviceCenter.path}/Native Library.xml').writeAsString('''
+<ProductHints><Product>
+  <Name>Native Library</Name><RegKey>Native Library</RegKey><SNPID>N01</SNPID>
+  <Type>Content</Type>
+</Product></ProductHints>
+''');
+      await File(
+        '${installed.path}/Native Library.json',
+      ).writeAsString('{"ContentDir":"${staleContent.path}"}');
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        expect(call.method, 'readInventory');
+        return <Map<String, Object?>>[
+          <String, Object?>{
+            'name': 'Native Library',
+            'regKey': 'Native Library',
+            'snpid': 'N01',
+            'contentPath': currentContent.path,
+            'visibility': 3,
+          },
+        ];
+      });
+
+      final snapshot = await WindowsKontaktPlatform(
+        serviceCenterPath: serviceCenter.path,
+        installedProductsPath: installed.path,
+      ).scanLibraries();
+
+      expect(snapshot.libraries.single.contentPath, currentContent.path);
+      expect(
+        snapshot.libraries.single.sources,
+        contains(RegistrationSource.windowsRegistry),
+      );
+    },
+  );
+
+  test(
     'standard inventory reports native bridge failures without fallback',
     () async {
       const channel = MethodChannel(
@@ -157,6 +215,67 @@ void main() {
       expect(
         snapshot.diagnostics.map((diagnostic) => diagnostic.code),
         contains('windows_registry_native_failed'),
+      );
+    },
+  );
+
+  test(
+    'standard inventory reports unreadable Windows catalog folders',
+    () async {
+      const channel = MethodChannel(
+        'com.juanayala.kontaktLibraryManager/windows_registry',
+      );
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+      messenger.setMockMethodCallHandler(channel, (call) async => const []);
+
+      final root = await Directory.systemTemp.createTemp('klm-windows-folder-');
+      addTearDown(() => root.delete(recursive: true));
+      final serviceFile = File('${root.path}/service-file');
+      await serviceFile.writeAsString('not a directory');
+      final installed = await Directory('${root.path}/installed').create();
+
+      final snapshot = await WindowsKontaktPlatform(
+        serviceCenterPath: serviceFile.path,
+        installedProductsPath: installed.path,
+      ).scanLibraries();
+
+      expect(
+        snapshot.diagnostics.map((diagnostic) => diagnostic.code),
+        contains('windows_service_center_unavailable'),
+      );
+    },
+  );
+
+  test(
+    'standard inventory reports Registry access denial separately',
+    () async {
+      const channel = MethodChannel(
+        'com.juanayala.kontaktLibraryManager/windows_registry',
+      );
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        throw PlatformException(code: 'registry_access_denied');
+      });
+
+      final root = await Directory.systemTemp.createTemp(
+        'klm-registry-denied-',
+      );
+      addTearDown(() => root.delete(recursive: true));
+      final serviceCenter = await Directory('${root.path}/service').create();
+      final installed = await Directory('${root.path}/installed').create();
+
+      final snapshot = await WindowsKontaktPlatform(
+        serviceCenterPath: serviceCenter.path,
+        installedProductsPath: installed.path,
+      ).scanLibraries();
+
+      expect(
+        snapshot.diagnostics.map((diagnostic) => diagnostic.code),
+        contains('windows_registry_access_denied'),
       );
     },
   );
@@ -249,6 +368,9 @@ void main() {
     'native mutations retain transport checks and transactional rollback',
     () {
       final nativeMutation = _source('windows/runner/native_mutation.cpp');
+      final platform = _source(
+        'lib/platform/windows/windows_kontakt_platform.dart',
+      );
 
       expect(nativeMutation, contains('kMaximumRequestBytes = 2500000'));
       expect(nativeMutation, contains('VerifySha256'));
@@ -259,6 +381,14 @@ void main() {
       expect(nativeMutation, contains('CaptureRegistryBackup'));
       expect(nativeMutation, contains('RestoreFileBackup'));
       expect(nativeMutation, contains('RestoreRegistryBackup'));
+      expect(nativeMutation, contains('UpdateContentDirectoryJson'));
+      expect(nativeMutation, contains('The existing installed_products JSON'));
+      expect(
+        nativeMutation,
+        contains('key == "ContentDir" || key == "contentDir"'),
+      );
+      expect(platform, contains('preferValues: true'));
+      expect(nativeMutation, contains('ContentDirectoryJson('));
       expect(nativeMutation, contains('KEY_WOW64_64KEY'));
       expect(nativeMutation, contains('KEY_WOW64_32KEY'));
     },

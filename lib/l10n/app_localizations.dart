@@ -279,6 +279,10 @@ class AppLocalizations {
       'issue_missing_content_path': 'The content path could not be determined.',
       'issue_content_offline':
           'The path does not exist or the drive is disconnected.',
+      'issue_content_permission_denied':
+          'The system did not allow KLM to verify the content path.',
+      'issue_content_unavailable':
+          'The content path could not be verified temporarily.',
       'issue_duplicate_snpid': 'Another library uses the same SNPID.',
       'issue_duplicate_path': 'The path is assigned to more than one library.',
       'issueKontakt6Incompatible':
@@ -291,6 +295,42 @@ class AppLocalizations {
           'installed_products for Kontakt 7/8 does not exist.',
       'diagnostic_invalid_json_title': 'Unreadable JSON',
       'diagnostic_invalid_json_message': 'A manifest could not be read.',
+      'diagnostic_windows_service_center_permission_denied_title':
+          'Service Center access denied',
+      'diagnostic_windows_service_center_permission_denied_message':
+          'Windows did not allow KLM to read the Service Center folder.',
+      'diagnostic_windows_service_center_unavailable_title':
+          'Service Center unavailable',
+      'diagnostic_windows_service_center_unavailable_message':
+          'Windows could not enumerate the Service Center folder.',
+      'diagnostic_windows_service_center_file_permission_denied_title':
+          'Service Center file access denied',
+      'diagnostic_windows_service_center_file_permission_denied_message':
+          'Windows did not allow KLM to read a Service Center file.',
+      'diagnostic_windows_service_center_file_unavailable_title':
+          'Service Center file unavailable',
+      'diagnostic_windows_service_center_file_unavailable_message':
+          'Windows could not read a Service Center file.',
+      'diagnostic_windows_installed_products_permission_denied_title':
+          'installed_products access denied',
+      'diagnostic_windows_installed_products_permission_denied_message':
+          'Windows did not allow KLM to read the installed_products folder.',
+      'diagnostic_windows_installed_products_unavailable_title':
+          'installed_products unavailable',
+      'diagnostic_windows_installed_products_unavailable_message':
+          'Windows could not enumerate the installed_products folder.',
+      'diagnostic_windows_installed_products_file_permission_denied_title':
+          'installed_products file access denied',
+      'diagnostic_windows_installed_products_file_permission_denied_message':
+          'Windows did not allow KLM to read an installed_products file.',
+      'diagnostic_windows_installed_products_file_unavailable_title':
+          'installed_products file unavailable',
+      'diagnostic_windows_installed_products_file_unavailable_message':
+          'Windows could not read an installed_products file.',
+      'diagnostic_windows_registry_access_denied_title':
+          'Windows Registry access denied',
+      'diagnostic_windows_registry_access_denied_message':
+          'Windows did not allow KLM to read the Native Instruments Registry.',
       'diagnostic_windows_registry_pending_title':
           'Windows Registry validation pending',
       'diagnostic_windows_registry_pending_message':
@@ -483,6 +523,10 @@ class AppLocalizations {
           'No se pudo determinar la ruta del contenido.',
       'issue_content_offline':
           'La ruta no existe o el disco está desconectado.',
+      'issue_content_permission_denied':
+          'El sistema no permitió que KLM verificara la ruta del contenido.',
+      'issue_content_unavailable':
+          'La ruta del contenido no pudo verificarse temporalmente.',
       'issue_duplicate_snpid': 'Otra librería utiliza el mismo SNPID.',
       'issue_duplicate_path': 'La ruta está asignada a más de una librería.',
       'issueKontakt6Incompatible':
@@ -497,6 +541,42 @@ class AppLocalizations {
       'diagnostic_invalid_json_title': 'JSON ilegible',
       'diagnostic_invalid_json_message':
           'No se pudo leer uno de los manifiestos.',
+      'diagnostic_windows_service_center_permission_denied_title':
+          'Acceso denegado a Service Center',
+      'diagnostic_windows_service_center_permission_denied_message':
+          'Windows no permitió que KLM leyera la carpeta de Service Center.',
+      'diagnostic_windows_service_center_unavailable_title':
+          'Service Center no disponible',
+      'diagnostic_windows_service_center_unavailable_message':
+          'Windows no pudo enumerar la carpeta de Service Center.',
+      'diagnostic_windows_service_center_file_permission_denied_title':
+          'Acceso denegado a un archivo de Service Center',
+      'diagnostic_windows_service_center_file_permission_denied_message':
+          'Windows no permitió que KLM leyera un archivo de Service Center.',
+      'diagnostic_windows_service_center_file_unavailable_title':
+          'Archivo de Service Center no disponible',
+      'diagnostic_windows_service_center_file_unavailable_message':
+          'Windows no pudo leer un archivo de Service Center.',
+      'diagnostic_windows_installed_products_permission_denied_title':
+          'Acceso denegado a installed_products',
+      'diagnostic_windows_installed_products_permission_denied_message':
+          'Windows no permitió que KLM leyera la carpeta installed_products.',
+      'diagnostic_windows_installed_products_unavailable_title':
+          'installed_products no disponible',
+      'diagnostic_windows_installed_products_unavailable_message':
+          'Windows no pudo enumerar la carpeta installed_products.',
+      'diagnostic_windows_installed_products_file_permission_denied_title':
+          'Acceso denegado a un archivo de installed_products',
+      'diagnostic_windows_installed_products_file_permission_denied_message':
+          'Windows no permitió que KLM leyera un archivo de installed_products.',
+      'diagnostic_windows_installed_products_file_unavailable_title':
+          'Archivo de installed_products no disponible',
+      'diagnostic_windows_installed_products_file_unavailable_message':
+          'Windows no pudo leer un archivo de installed_products.',
+      'diagnostic_windows_registry_access_denied_title':
+          'Acceso denegado al Registro de Windows',
+      'diagnostic_windows_registry_access_denied_message':
+          'Windows no permitió que KLM leyera el Registro de Native Instruments.',
       'diagnostic_windows_registry_pending_title':
           'Validación del Registro de Windows pendiente',
       'diagnostic_windows_registry_pending_message':
@@ -686,6 +766,10 @@ class AppLocalizations {
           'Não foi possível determinar o caminho do conteúdo.',
       'issue_content_offline':
           'O caminho não existe ou a unidade está desconectada.',
+      'issue_content_permission_denied':
+          'O sistema não permitiu que o KLM verificasse o caminho do conteúdo.',
+      'issue_content_unavailable':
+          'Não foi possível verificar temporariamente o caminho do conteúdo.',
       'issue_duplicate_snpid': 'Outra biblioteca usa o mesmo SNPID.',
       'issue_duplicate_path':
           'O caminho está atribuído a mais de uma biblioteca.',
@@ -868,6 +952,8 @@ class AppLocalizations {
           'Kontakt 正在隐藏此音色库（可见性={visibility}）。请修复其记录以显示它。',
       'issue_missing_content_path': '无法确定内容路径。',
       'issue_content_offline': '路径不存在或磁盘已断开连接。',
+      'issue_content_permission_denied': '系统不允许 KLM 验证内容路径。',
+      'issue_content_unavailable': '暂时无法验证内容路径。',
       'issue_duplicate_snpid': '另一个音色库使用相同的 SNPID。',
       'issue_duplicate_path': '该路径分配给了多个音色库。',
       'issueKontakt6Incompatible': '元数据要求 Kontakt {version} 或更高版本。',

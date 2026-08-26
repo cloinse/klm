@@ -105,7 +105,51 @@ void main() {
 
     expect(
       result.single.issues.map((issue) => issue.code),
-      contains('content_offline'),
+      contains('content_unavailable'),
     );
+  });
+
+  test('separa acceso denegado de una ruta offline', () async {
+    const library = KontaktLibrary(
+      id: 'protected',
+      name: 'Protected',
+      contentPath: '/Volumes/Protected/Library',
+    );
+
+    final result = await validator.validateAsync(const [
+      library,
+    ], pathProbe: (_) async => ContentPathAccess.permissionDenied);
+    final codes = result.single.issues.map((issue) => issue.code);
+
+    expect(codes, contains('content_permission_denied'));
+    expect(codes, isNot(contains('content_offline')));
+    expect(result.single.health, LibraryHealth.warning);
+  });
+
+  test('limita la concurrencia al comprobar inventarios grandes', () async {
+    final libraries = List<KontaktLibrary>.generate(
+      40,
+      (index) => KontaktLibrary(
+        id: 'library-$index',
+        name: 'Library $index',
+        contentPath: '/Volumes/Libraries/$index',
+      ),
+    );
+    var active = 0;
+    var maximumActive = 0;
+
+    await validator.validateAsync(
+      libraries,
+      maxConcurrentPathChecks: 3,
+      pathProbe: (_) async {
+        active++;
+        if (active > maximumActive) maximumActive = active;
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+        active--;
+        return ContentPathAccess.available;
+      },
+    );
+
+    expect(maximumActive, 3);
   });
 }

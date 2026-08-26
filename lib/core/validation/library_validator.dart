@@ -2,22 +2,44 @@ import 'dart:io';
 
 import 'package:kontakt_library_manager/core/models/kontakt_library.dart';
 
+enum ContentPathAccess { available, missing, permissionDenied, unavailable }
+
 class LibraryValidator {
   const LibraryValidator();
 
   List<KontaktLibrary> validate(List<KontaktLibrary> libraries) {
     return _validate(
       libraries,
-      pathExists: (path) => Directory(path).existsSync(),
+      pathAccess: (path) => Directory(path).existsSync()
+          ? ContentPathAccess.available
+          : ContentPathAccess.missing,
     );
   }
 
   Future<List<KontaktLibrary>> validateAsync(
     List<KontaktLibrary> libraries, {
     Duration pathCheckTimeout = const Duration(seconds: 5),
+    int maxConcurrentPathChecks = 16,
     Future<bool> Function(String path)? pathExists,
+    Future<ContentPathAccess> Function(String path)? pathProbe,
   }) async {
-    final probe = pathExists ?? (path) => Directory(path).exists();
+    if (maxConcurrentPathChecks < 1) {
+      throw ArgumentError.value(
+        maxConcurrentPathChecks,
+        'maxConcurrentPathChecks',
+        'Must be greater than zero.',
+      );
+    }
+    final probe =
+        pathProbe ??
+        (path) async {
+          final exists = pathExists == null
+              ? await Directory(path).exists()
+              : await pathExists(path);
+          return exists
+              ? ContentPathAccess.available
+              : ContentPathAccess.missing;
+        };
     final paths = <String, String>{};
     for (final library in libraries) {
       final path = library.contentPath?.trim();
@@ -26,25 +48,43 @@ class LibraryValidator {
       }
     }
 
-    final results = await Future.wait(
-      paths.entries.map((entry) async {
-        var exists = false;
-        try {
-          exists = await probe(entry.value).timeout(pathCheckTimeout);
-        } catch (_) {}
-        return MapEntry(entry.key, exists);
-      }),
+    final entries = paths.entries.toList(growable: false);
+    final results = List<MapEntry<String, ContentPathAccess>?>.filled(
+      entries.length,
+      null,
     );
-    final pathStates = Map<String, bool>.fromEntries(results);
+    var nextIndex = 0;
+    Future<void> checkNextPaths() async {
+      while (nextIndex < entries.length) {
+        final index = nextIndex++;
+        final entry = entries[index];
+        var access = ContentPathAccess.unavailable;
+        try {
+          access = await probe(entry.value).timeout(pathCheckTimeout);
+        } catch (_) {}
+        results[index] = MapEntry(entry.key, access);
+      }
+    }
+
+    final workerCount = entries.length < maxConcurrentPathChecks
+        ? entries.length
+        : maxConcurrentPathChecks;
+    await Future.wait(
+      List<Future<void>>.generate(workerCount, (_) => checkNextPaths()),
+    );
+    final pathStates = Map<String, ContentPathAccess>.fromEntries(
+      results.whereType<MapEntry<String, ContentPathAccess>>(),
+    );
     return _validate(
       libraries,
-      pathExists: (path) => pathStates[path.toLowerCase()] ?? false,
+      pathAccess: (path) =>
+          pathStates[path.toLowerCase()] ?? ContentPathAccess.unavailable,
     );
   }
 
   List<KontaktLibrary> _validate(
     List<KontaktLibrary> libraries, {
-    required bool Function(String path) pathExists,
+    required ContentPathAccess Function(String path) pathAccess,
   }) {
     final snpidCounts = <String, int>{};
     final pathCounts = <String, int>{};
@@ -115,14 +155,40 @@ class LibraryValidator {
                 severity: IssueSeverity.error,
               ),
             );
-          } else if (!pathExists(path)) {
-            issues.add(
-              const LibraryIssue(
-                code: 'content_offline',
-                message: 'La ruta no existe o el disco está desconectado.',
-                severity: IssueSeverity.error,
-              ),
-            );
+          } else {
+            switch (pathAccess(path)) {
+              case ContentPathAccess.available:
+                break;
+              case ContentPathAccess.missing:
+                issues.add(
+                  const LibraryIssue(
+                    code: 'content_offline',
+                    message: 'La ruta no existe o el disco está desconectado.',
+                    severity: IssueSeverity.error,
+                  ),
+                );
+                break;
+              case ContentPathAccess.permissionDenied:
+                issues.add(
+                  const LibraryIssue(
+                    code: 'content_permission_denied',
+                    message:
+                        'El sistema no permitió verificar la ruta del contenido.',
+                    severity: IssueSeverity.warning,
+                  ),
+                );
+                break;
+              case ContentPathAccess.unavailable:
+                issues.add(
+                  const LibraryIssue(
+                    code: 'content_unavailable',
+                    message:
+                        'La ruta del contenido no pudo verificarse temporalmente.',
+                    severity: IssueSeverity.warning,
+                  ),
+                );
+                break;
+            }
           }
           if ((snpidCounts[library.snpid?.toLowerCase()] ?? 0) > 1) {
             issues.add(

@@ -64,8 +64,8 @@ class WindowsKontaktPlatform implements KontaktPlatform {
     final totalStopwatch = Stopwatch()..start();
     final assembler = InventoryAssembler();
     final diagnostics = <InventoryDiagnostic>[];
-    final knownRegKeys = <String>{};
-    final excludedRegKeys = <String>{};
+    final knownIdentities = <String>{};
+    final excludedIdentities = <String>{};
     final registryResult = _readRegistryRecords();
     final programFiles =
         Platform.environment['PROGRAMFILES'] ?? r'C:\Program Files';
@@ -79,8 +79,9 @@ class WindowsKontaktPlatform implements KontaktPlatform {
             '$programFiles${Platform.pathSeparator}Common Files${Platform.pathSeparator}Native Instruments${Platform.pathSeparator}Service Center',
       ),
       assembler,
-      knownRegKeys,
-      excludedRegKeys,
+      diagnostics,
+      knownIdentities,
+      excludedIdentities,
     );
     xmlStopwatch.stop();
     final jsonStopwatch = Stopwatch()..start();
@@ -91,8 +92,8 @@ class WindowsKontaktPlatform implements KontaktPlatform {
       ),
       assembler,
       diagnostics,
-      knownRegKeys,
-      excludedRegKeys,
+      knownIdentities,
+      excludedIdentities,
     );
     jsonStopwatch.stop();
     final loadedRegistry = await registryResult;
@@ -100,16 +101,20 @@ class WindowsKontaktPlatform implements KontaktPlatform {
     _addRegistryRecords(
       loadedRegistry.records,
       assembler,
-      knownRegKeys,
-      excludedRegKeys,
+      knownIdentities,
+      excludedIdentities,
     );
 
     final validationStopwatch = Stopwatch()..start();
-    final libraries = await _validator.validateAsync(assembler.build())
-      ..sort(
-        (left, right) =>
-            left.name.toLowerCase().compareTo(right.name.toLowerCase()),
-      );
+    final libraries =
+        await _validator.validateAsync(
+            assembler.build(),
+            pathProbe: _probeContentPath,
+          )
+          ..sort(
+            (left, right) =>
+                left.name.toLowerCase().compareTo(right.name.toLowerCase()),
+          );
     validationStopwatch.stop();
     totalStopwatch.stop();
     if (!kReleaseMode) {
@@ -174,11 +179,15 @@ class WindowsKontaktPlatform implements KontaktPlatform {
       }
     }
 
-    final libraries = await _validator.validateAsync(assembler.build())
-      ..sort(
-        (left, right) =>
-            left.name.toLowerCase().compareTo(right.name.toLowerCase()),
-      );
+    final libraries =
+        await _validator.validateAsync(
+            assembler.build(),
+            pathProbe: _probeContentPath,
+          )
+          ..sort(
+            (left, right) =>
+                left.name.toLowerCase().compareTo(right.name.toLowerCase()),
+          );
     return InventorySnapshot(
       libraries: libraries,
       diagnostics: diagnostics,
@@ -189,29 +198,59 @@ class WindowsKontaktPlatform implements KontaktPlatform {
   Future<void> _readXmlDirectory(
     Directory directory,
     InventoryAssembler assembler,
-    Set<String> knownRegKeys,
-    Set<String> excludedRegKeys,
+    List<InventoryDiagnostic> diagnostics,
+    Set<String> knownIdentities,
+    Set<String> excludedIdentities,
   ) async {
-    if (!await directory.exists()) return;
-    await for (final entity in directory.list(followLinks: false)) {
+    final entities = await _listDirectory(
+      directory,
+      diagnostics,
+      missingCode: 'service_center_missing',
+      missingTitle: 'Service Center no encontrado',
+      missingMessage: 'No existe la carpeta compartida de Service Center.',
+      permissionCode: 'windows_service_center_permission_denied',
+      permissionTitle: 'Permiso denegado para Service Center',
+      permissionMessage:
+          'Windows no permitió leer la carpeta de Service Center.',
+      unavailableCode: 'windows_service_center_unavailable',
+      unavailableTitle: 'Service Center no disponible',
+      unavailableMessage:
+          'Windows no pudo enumerar la carpeta de Service Center.',
+    );
+    for (final entity in entities) {
       if (entity is! File || !entity.path.toLowerCase().endsWith('.xml')) {
         continue;
       }
       try {
         final metadata = _parser.parseBytes(await entity.readAsBytes());
         if (!metadata.isKontaktLibraryMetadata) {
-          excludedRegKeys
-            ..add(metadata.regKey.toLowerCase())
-            ..add(metadata.name.toLowerCase());
+          _addIdentities(
+            excludedIdentities,
+            metadata.name,
+            metadata.regKey,
+            metadata.snpid,
+          );
           continue;
         }
-        knownRegKeys.add(metadata.regKey.toLowerCase());
+        _addIdentities(
+          knownIdentities,
+          metadata.name,
+          metadata.regKey,
+          metadata.snpid,
+        );
         assembler.add(
           name: metadata.name,
           regKey: metadata.regKey,
           snpid: metadata.snpid,
           minimumKontaktVersion: metadata.minimumKontaktVersion,
           source: RegistrationSource.serviceCenter,
+        );
+      } on FileSystemException catch (error) {
+        _addFileReadDiagnostic(
+          diagnostics,
+          error,
+          area: 'service_center',
+          path: entity.path,
         );
       } catch (_) {}
     }
@@ -221,11 +260,25 @@ class WindowsKontaktPlatform implements KontaktPlatform {
     Directory directory,
     InventoryAssembler assembler,
     List<InventoryDiagnostic> diagnostics,
-    Set<String> knownRegKeys,
-    Set<String> excludedRegKeys,
+    Set<String> knownIdentities,
+    Set<String> excludedIdentities,
   ) async {
-    if (!await directory.exists()) return;
-    await for (final entity in directory.list(followLinks: false)) {
+    final entities = await _listDirectory(
+      directory,
+      diagnostics,
+      missingCode: 'installed_products_missing',
+      missingTitle: 'Catálogo moderno no encontrado',
+      missingMessage: 'No existe installed_products para Kontakt 7/8.',
+      permissionCode: 'windows_installed_products_permission_denied',
+      permissionTitle: 'Permiso denegado para installed_products',
+      permissionMessage:
+          'Windows no permitió leer la carpeta installed_products.',
+      unavailableCode: 'windows_installed_products_unavailable',
+      unavailableTitle: 'Catálogo moderno no disponible',
+      unavailableMessage:
+          'Windows no pudo enumerar la carpeta installed_products.',
+    );
+    for (final entity in entities) {
       if (entity is! File || !entity.path.toLowerCase().endsWith('.json')) {
         continue;
       }
@@ -238,23 +291,29 @@ class WindowsKontaktPlatform implements KontaktPlatform {
         final snpid = decoded['SNPID'] as String?;
         final contentPath =
             (decoded['ContentDir'] ?? decoded['contentDir']) as String?;
-        final identity = (regKey ?? name).toLowerCase();
-        if (excludedRegKeys.contains(identity) ||
-            excludedRegKeys.contains(name.toLowerCase())) {
+        final identities = _identities(name, regKey, snpid);
+        if (_intersects(excludedIdentities, identities)) {
           continue;
         }
-        if (!knownRegKeys.contains(identity) &&
+        if (!_intersects(knownIdentities, identities) &&
             (snpid?.trim().isEmpty != false ||
                 contentPath?.trim().isEmpty != false)) {
           continue;
         }
-        knownRegKeys.add(identity);
+        knownIdentities.addAll(identities);
         assembler.add(
           name: name,
           regKey: regKey,
           snpid: snpid,
           contentPath: contentPath,
           source: RegistrationSource.installedProducts,
+        );
+      } on FileSystemException catch (error) {
+        _addFileReadDiagnostic(
+          diagnostics,
+          error,
+          area: 'installed_products',
+          path: entity.path,
         );
       } catch (error) {
         diagnostics.add(
@@ -267,6 +326,85 @@ class WindowsKontaktPlatform implements KontaktPlatform {
           ),
         );
       }
+    }
+  }
+
+  void _addFileReadDiagnostic(
+    List<InventoryDiagnostic> diagnostics,
+    FileSystemException error, {
+    required String area,
+    required String path,
+  }) {
+    final permissionDenied = error.osError?.errorCode == 5;
+    diagnostics.add(
+      InventoryDiagnostic(
+        code: permissionDenied
+            ? 'windows_${area}_file_permission_denied'
+            : 'windows_${area}_file_unavailable',
+        title: permissionDenied
+            ? 'Permiso denegado para un archivo de $area'
+            : 'Archivo de $area no disponible',
+        message: permissionDenied
+            ? 'Windows no permitió leer $path.'
+            : 'Windows no pudo leer $path.',
+        severity: IssueSeverity.warning,
+        detail: error.toString(),
+      ),
+    );
+  }
+
+  Future<List<FileSystemEntity>> _listDirectory(
+    Directory directory,
+    List<InventoryDiagnostic> diagnostics, {
+    required String missingCode,
+    required String missingTitle,
+    required String missingMessage,
+    required String permissionCode,
+    required String permissionTitle,
+    required String permissionMessage,
+    required String unavailableCode,
+    required String unavailableTitle,
+    required String unavailableMessage,
+  }) async {
+    try {
+      return await directory.list(followLinks: false).toList();
+    } on FileSystemException catch (error) {
+      final code = error.osError?.errorCode;
+      final isMissing = code == 2 || code == 3 || code == 15;
+      final isPermissionDenied = code == 5;
+      diagnostics.add(
+        InventoryDiagnostic(
+          code: isMissing
+              ? missingCode
+              : isPermissionDenied
+              ? permissionCode
+              : unavailableCode,
+          title: isMissing
+              ? missingTitle
+              : isPermissionDenied
+              ? permissionTitle
+              : unavailableTitle,
+          message: isMissing
+              ? missingMessage
+              : isPermissionDenied
+              ? permissionMessage
+              : unavailableMessage,
+          severity: IssueSeverity.warning,
+          detail: error.toString(),
+        ),
+      );
+      return const <FileSystemEntity>[];
+    } catch (error) {
+      diagnostics.add(
+        InventoryDiagnostic(
+          code: unavailableCode,
+          title: unavailableTitle,
+          message: unavailableMessage,
+          severity: IssueSeverity.warning,
+          detail: error.toString(),
+        ),
+      );
+      return const <FileSystemEntity>[];
     }
   }
 
@@ -291,12 +429,16 @@ class WindowsKontaktPlatform implements KontaktPlatform {
             'El componente nativo de Windows no está disponible. Reinstala o actualiza Kontakt Library Manager.',
       );
     } on PlatformException catch (error) {
+      final accessDenied = error.code == 'registry_access_denied';
       return _nativeRegistryReadFailure(
         error,
         stopwatch,
-        code: 'windows_registry_native_failed',
-        message:
-            'No se pudo leer el Registro de Native Instruments con el componente nativo.',
+        code: accessDenied
+            ? 'windows_registry_access_denied'
+            : 'windows_registry_native_failed',
+        message: accessDenied
+            ? 'Windows no permitió leer el Registro de Native Instruments.'
+            : 'No se pudo leer el Registro de Native Instruments con el componente nativo.',
       );
     }
   }
@@ -340,35 +482,71 @@ class WindowsKontaktPlatform implements KontaktPlatform {
   void _addRegistryRecords(
     List<Map<String, Object?>> records,
     InventoryAssembler assembler,
-    Set<String> knownRegKeys,
-    Set<String> excludedRegKeys,
+    Set<String> knownIdentities,
+    Set<String> excludedIdentities,
   ) {
     for (final record in records) {
       final regKey = record['regKey'] as String?;
       final snpid = record['snpid'] as String?;
       final contentPath = record['contentPath'] as String?;
-      final isKnownLibrary =
-          regKey != null && knownRegKeys.contains(regKey.trim().toLowerCase());
-      final isExcluded =
-          regKey != null &&
-          excludedRegKeys.contains(regKey.trim().toLowerCase());
+      if (regKey == null) continue;
+      final name = record['name'] as String? ?? regKey;
+      final identities = _identities(name, regKey, snpid);
+      final isKnownLibrary = _intersects(knownIdentities, identities);
+      final isExcluded = _intersects(excludedIdentities, identities);
       final hasLibraryIdentity =
           snpid?.trim().isNotEmpty == true &&
           contentPath?.trim().isNotEmpty == true;
-      if (regKey == null ||
-          isExcluded ||
-          (!isKnownLibrary && !hasLibraryIdentity)) {
+      if (isExcluded || (!isKnownLibrary && !hasLibraryIdentity)) {
         continue;
       }
+      knownIdentities.addAll(identities);
       assembler.add(
-        name: record['name'] as String? ?? regKey,
+        name: name,
         regKey: regKey,
         snpid: snpid,
         contentPath: contentPath,
         visibility: _intValue(record['visibility']),
         userListIndex: _intValue(record['userListIndex']),
+        preferContentPath: true,
+        preferValues: true,
         source: RegistrationSource.windowsRegistry,
       );
+    }
+  }
+
+  Set<String> _identities(String name, String? regKey, String? snpid) {
+    return {name, ?regKey, ?snpid}
+        .map((value) => value.trim().toLowerCase())
+        .where((value) => value.isNotEmpty)
+        .toSet();
+  }
+
+  void _addIdentities(
+    Set<String> destination,
+    String name,
+    String? regKey,
+    String? snpid,
+  ) {
+    destination.addAll(_identities(name, regKey, snpid));
+  }
+
+  bool _intersects(Set<String> left, Set<String> right) {
+    return right.any(left.contains);
+  }
+
+  Future<ContentPathAccess> _probeContentPath(String path) async {
+    try {
+      await Directory(path).list(followLinks: false).take(1).drain<void>();
+      return ContentPathAccess.available;
+    } on FileSystemException catch (error) {
+      return switch (error.osError?.errorCode) {
+        5 => ContentPathAccess.permissionDenied,
+        2 || 3 || 15 || 18 || 21 || 267 => ContentPathAccess.missing,
+        _ => ContentPathAccess.unavailable,
+      };
+    } catch (_) {
+      return ContentPathAccess.unavailable;
     }
   }
 

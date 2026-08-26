@@ -137,6 +137,8 @@ class ProductMetadata {
     this.minimumKontaktVersion,
     this.productType,
     this.company,
+    this.poweredBy,
+    this.icon,
     this.applications = const <String>{},
   });
 
@@ -151,11 +153,32 @@ class ProductMetadata {
   final String? minimumKontaktVersion;
   final String? productType;
   final String? company;
+  final String? poweredBy;
+  final String? icon;
   final Set<String> applications;
 
   bool get isKontaktLibraryMetadata {
     final normalizedType = productType?.trim().toLowerCase();
     if (normalizedType == 'plugin') return false;
-    return normalizedType == 'content' || applications.contains('kontakt');
+
+    final normalizedPoweredBy = poweredBy?.trim().toLowerCase();
+    if (normalizedPoweredBy?.isNotEmpty == true) {
+      return normalizedPoweredBy!.contains('kontakt');
+    }
+
+    final normalizedApplications = applications
+        .map((application) => application.trim().toLowerCase())
+        .where((application) => application.isNotEmpty)
+        .toSet();
+    if (normalizedApplications.isNotEmpty) {
+      return normalizedApplications.contains('kontakt');
+    }
+
+    final normalizedIcon = icon?.trim().toLowerCase();
+    if (normalizedIcon?.contains('kontakt') == true) return true;
+
+    // Older third-party Kontakt libraries commonly expose only Type=Content.
+    // Keep accepting them when no engine-specific marker contradicts it.
+    return normalizedType == 'content';
   }
 }

@@ -491,17 +491,32 @@ bool WriteClassicOrder(const std::vector<ClassicOrderEntry>& entries) {
   return success;
 }
 
-flutter::EncodableList ReadRegistryInventory() {
+std::optional<flutter::EncodableList> ReadRegistryInventory(
+    std::string* error_code, std::string* error_message) {
   UserListIndexes user_list_indexes;
   AddUserListIndexes(KEY_WOW64_64KEY, &user_list_indexes);
   AddUserListIndexes(KEY_WOW64_32KEY, &user_list_indexes);
 
   flutter::EncodableList records;
   std::unordered_set<std::wstring> seen;
+  bool access_denied = false;
   for (const REGSAM view : {KEY_WOW64_64KEY, KEY_WOW64_32KEY}) {
-    ScopedRegistryKey root =
-        OpenKey(HKEY_LOCAL_MACHINE, kNativeInstrumentsKey, KEY_READ | view);
-    if (!root) continue;
+    HKEY raw_root = nullptr;
+    const LONG root_status = ::RegOpenKeyExW(
+        HKEY_LOCAL_MACHINE, kNativeInstrumentsKey, 0, KEY_READ | view,
+        &raw_root);
+    if (root_status == ERROR_FILE_NOT_FOUND) continue;
+    if (root_status == ERROR_ACCESS_DENIED) {
+      access_denied = true;
+      continue;
+    }
+    if (root_status != ERROR_SUCCESS) {
+      *error_code = "registry_read_failed";
+      *error_message = "Native Instruments Registry access failed (Win32 " +
+                       std::to_string(root_status) + ").";
+      return std::nullopt;
+    }
+    ScopedRegistryKey root(raw_root);
 
     for (const std::wstring& subkey_name : SubKeyNames(root.get())) {
       const std::wstring identity = Normalize(subkey_name);
@@ -547,6 +562,12 @@ flutter::EncodableList ReadRegistryInventory() {
       records.emplace_back(std::move(record));
       seen.insert(identity);
     }
+  }
+  if (records.empty() && access_denied) {
+    *error_code = "registry_access_denied";
+    *error_message =
+        "Windows denied access to the Native Instruments Registry.";
+    return std::nullopt;
   }
   return records;
 }
@@ -596,9 +617,12 @@ void RegistryBridge::HandleMethodCall(
     result->NotImplemented();
     return;
   }
-  try {
-    result->Success(flutter::EncodableValue(ReadRegistryInventory()));
-  } catch (const std::exception& error) {
-    result->Error("registry_read_failed", error.what());
+  std::string error_code;
+  std::string error_message;
+  const auto records = ReadRegistryInventory(&error_code, &error_message);
+  if (!records.has_value()) {
+    result->Error(error_code.c_str(), error_message.c_str());
+    return;
   }
+  result->Success(flutter::EncodableValue(*records));
 }

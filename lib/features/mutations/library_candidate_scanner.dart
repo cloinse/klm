@@ -68,6 +68,7 @@ class LibraryCandidateScanner {
     final candidates = <KontaktLibraryCandidate>[];
     for (final file in files) {
       final document = _parser.parseDocumentBytes(await file.readAsBytes());
+      if (!document.metadata.isKontaktLibraryMetadata) continue;
       candidates.add(
         KontaktLibraryCandidate(
           contentPath: canonicalContentPath,
@@ -75,6 +76,11 @@ class LibraryCandidateScanner {
           metadata: document.metadata,
           productHintsXml: document.xml,
         ),
+      );
+    }
+    if (candidates.isEmpty) {
+      throw const LibraryCandidateException(
+        'The selected folder does not contain Kontakt library metadata.',
       );
     }
     return candidates;

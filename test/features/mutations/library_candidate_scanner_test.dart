@@ -38,6 +38,23 @@ void main() {
     );
   });
 
+  test('rejects Reaktor content even when it uses ProductHints', () async {
+    final directory = await Directory.systemTemp.createTemp('klm-reaktor-');
+    addTearDown(() => directory.delete(recursive: true));
+    await File('${directory.path}/Reaktor.nicnt').writeAsString('''
+<ProductHints><Product>
+  <Name>Reaktor Library</Name><RegKey>Reaktor Library</RegKey><SNPID>R01</SNPID>
+  <Type>Content</Type><PoweredBy>Reaktor</PoweredBy>
+  <Relevance><Application>Reaktor</Application></Relevance>
+</Product></ProductHints>
+''');
+
+    expect(
+      () => scanner.scanDirectory(directory.path),
+      throwsA(isA<LibraryCandidateException>()),
+    );
+  });
+
   test('rejects unsafe names before creating a mutation request', () async {
     final directory = await Directory.systemTemp.createTemp('klm-unsafe-');
     addTearDown(() => directory.delete(recursive: true));
@@ -76,6 +93,7 @@ String _productHints({
   return '''
 <ProductHints><Product>
   <Name>$name</Name><RegKey>$regKey</RegKey><SNPID>$snpid</SNPID>
+  <Type>Content</Type><PoweredBy>Kontakt</PoweredBy>
   <ProductSpecific><Visibility>3</Visibility></ProductSpecific>
 </Product></ProductHints>
 ''';

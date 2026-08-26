@@ -128,6 +128,32 @@ otros datos
     expect(metadata.isKontaktLibraryMetadata, isTrue);
   });
 
+  test('uses engine markers to exclude non-Kontakt content', () {
+    const reaktorXml = '''
+<ProductHints><Product>
+  <Name>Reaktor Factory Library</Name><RegKey>Reaktor Factory Library</RegKey><SNPID>R01</SNPID>
+  <Type>Content</Type><PoweredBy>Reaktor</PoweredBy><Icon>reaktor</Icon>
+  <Relevance><Application>Reaktor</Application></Relevance>
+</Product></ProductHints>
+''';
+    const poweredByKontaktXml = '''
+<ProductHints><Product>
+  <Name>Legacy Kontakt Library</Name><RegKey>Legacy Kontakt Library</RegKey><SNPID>K01</SNPID>
+  <PoweredBy>Kontakt</PoweredBy><Icon>kontakt</Icon>
+</Product></ProductHints>
+''';
+
+    final reaktor = parser.parseText(reaktorXml);
+    final kontakt = parser.parseText(poweredByKontaktXml);
+
+    expect(reaktor.poweredBy, 'Reaktor');
+    expect(reaktor.icon, 'reaktor');
+    expect(reaktor.isKontaktLibraryMetadata, isFalse);
+    expect(kontakt.poweredBy, 'Kontakt');
+    expect(kontakt.icon, 'kontakt');
+    expect(kontakt.isKontaktLibraryMetadata, isTrue);
+  });
+
   test('rechaza metadata sin campos obligatorios', () {
     const xml =
         '<ProductHints><Product><Name>A</Name></Product></ProductHints>';

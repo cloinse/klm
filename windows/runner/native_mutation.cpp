@@ -736,8 +736,244 @@ std::string JsonEscapeUtf8(const std::wstring& value) {
   return escaped;
 }
 
-std::string ContentDirectoryJson(const std::wstring& content_path) {
-  return "{\"ContentDir\":\"" + JsonEscapeUtf8(content_path) + "\"}";
+bool IsJsonWhitespace(char character) {
+  return character == ' ' || character == '\t' || character == '\r' ||
+         character == '\n';
+}
+
+size_t SkipJsonWhitespace(const std::string& text, size_t position) {
+  while (position < text.size() && IsJsonWhitespace(text[position])) {
+    ++position;
+  }
+  return position;
+}
+
+int JsonHexValue(char character) {
+  if (character >= '0' && character <= '9') return character - '0';
+  if (character >= 'a' && character <= 'f') return character - 'a' + 10;
+  if (character >= 'A' && character <= 'F') return character - 'A' + 10;
+  return -1;
+}
+
+bool ParseJsonString(const std::string& text, size_t start, size_t* end,
+                     std::string* value) {
+  if (start >= text.size() || text[start] != '"') return false;
+  value->clear();
+  for (size_t position = start + 1; position < text.size(); ++position) {
+    const unsigned char character =
+        static_cast<unsigned char>(text[position]);
+    if (character == '"') {
+      *end = position + 1;
+      return true;
+    }
+    if (character < 0x20) return false;
+    if (character != '\\') {
+      value->push_back(static_cast<char>(character));
+      continue;
+    }
+    if (++position >= text.size()) return false;
+    switch (text[position]) {
+      case '"':
+      case '\\':
+      case '/':
+        value->push_back(text[position]);
+        break;
+      case 'b':
+        value->push_back('\b');
+        break;
+      case 'f':
+        value->push_back('\f');
+        break;
+      case 'n':
+        value->push_back('\n');
+        break;
+      case 'r':
+        value->push_back('\r');
+        break;
+      case 't':
+        value->push_back('\t');
+        break;
+      case 'u': {
+        if (position + 4 >= text.size()) return false;
+        unsigned value_code = 0;
+        for (size_t offset = 1; offset <= 4; ++offset) {
+          const int nibble = JsonHexValue(text[position + offset]);
+          if (nibble < 0) return false;
+          value_code = (value_code << 4) | static_cast<unsigned>(nibble);
+        }
+        if (value_code <= 0x7f) {
+          value->push_back(static_cast<char>(value_code));
+        } else {
+          // Product field names are ASCII. Keep non-ASCII escaped keys from
+          // being mistaken for ContentDir while still parsing the document.
+          value->push_back('?');
+        }
+        position += 4;
+        break;
+      }
+      default:
+        return false;
+    }
+  }
+  return false;
+}
+
+bool SkipJsonValue(const std::string& text, size_t start, size_t* end) {
+  if (start >= text.size()) return false;
+  if (text[start] == '"') {
+    std::string ignored;
+    return ParseJsonString(text, start, end, &ignored);
+  }
+  if (text[start] == '{' || text[start] == '[') {
+    std::vector<char> containers;
+    for (size_t position = start; position < text.size(); ++position) {
+      const char character = text[position];
+      if (character == '"') {
+        size_t string_end = 0;
+        std::string ignored;
+        if (!ParseJsonString(text, position, &string_end, &ignored)) {
+          return false;
+        }
+        position = string_end - 1;
+        continue;
+      }
+      if (character == '{' || character == '[') {
+        containers.push_back(character);
+        continue;
+      }
+      if (character != '}' && character != ']') continue;
+      if (containers.empty() ||
+          (character == '}' && containers.back() != '{') ||
+          (character == ']' && containers.back() != '[')) {
+        return false;
+      }
+      containers.pop_back();
+      if (containers.empty()) {
+        *end = position + 1;
+        return true;
+      }
+    }
+    return false;
+  }
+  size_t position = start;
+  while (position < text.size() && !IsJsonWhitespace(text[position]) &&
+         text[position] != ',' && text[position] != '}' &&
+         text[position] != ']') {
+    ++position;
+  }
+  if (position == start) return false;
+  *end = position;
+  return true;
+}
+
+std::optional<std::string> UpdateContentDirectoryJson(
+    const std::vector<std::uint8_t>& bytes,
+    const std::wstring& content_path) {
+  std::string text(bytes.begin(), bytes.end());
+  size_t root = SkipJsonWhitespace(text, 0);
+  if (text.size() >= 3 && static_cast<unsigned char>(text[0]) == 0xef &&
+      static_cast<unsigned char>(text[1]) == 0xbb &&
+      static_cast<unsigned char>(text[2]) == 0xbf) {
+    root = SkipJsonWhitespace(text, 3);
+  }
+  if (root >= text.size() || text[root] != '{') return std::nullopt;
+
+  const std::string replacement_value =
+      "\"" + JsonEscapeUtf8(content_path) + "\"";
+  size_t position = root + 1;
+  bool has_member = false;
+  bool found_content_directory = false;
+  bool expect_member = false;
+  size_t closing_brace = std::string::npos;
+  while (true) {
+    position = SkipJsonWhitespace(text, position);
+    if (position >= text.size()) return std::nullopt;
+    if (text[position] == '}') {
+      if (expect_member) return std::nullopt;
+      closing_brace = position;
+      break;
+    }
+    std::string key;
+    size_t key_end = 0;
+    if (!ParseJsonString(text, position, &key_end, &key)) {
+      return std::nullopt;
+    }
+    position = SkipJsonWhitespace(text, key_end);
+    if (position >= text.size() || text[position] != ':') {
+      return std::nullopt;
+    }
+    position = SkipJsonWhitespace(text, position + 1);
+    const size_t value_start = position;
+    size_t value_end = 0;
+    if (!SkipJsonValue(text, value_start, &value_end)) return std::nullopt;
+    expect_member = false;
+    if (key == "ContentDir" || key == "contentDir") {
+      if (found_content_directory) return std::nullopt;
+      found_content_directory = true;
+      text.replace(value_start, value_end - value_start, replacement_value);
+      position = value_start + replacement_value.size();
+    } else {
+      position = value_end;
+    }
+    has_member = true;
+    position = SkipJsonWhitespace(text, position);
+    if (position >= text.size()) return std::nullopt;
+    if (text[position] == ',') {
+      ++position;
+      expect_member = true;
+      continue;
+    }
+    if (text[position] == '}') {
+      expect_member = false;
+      closing_brace = position;
+      break;
+    }
+    return std::nullopt;
+  }
+
+  if (closing_brace == std::string::npos ||
+      SkipJsonWhitespace(text, closing_brace + 1) != text.size()) {
+    return std::nullopt;
+  }
+  if (!found_content_directory) {
+    std::string insertion;
+    if (has_member) insertion = ",";
+    insertion += "\"ContentDir\":\"" + JsonEscapeUtf8(content_path) +
+                 "\"";
+    text.insert(closing_brace, insertion);
+  }
+  return text;
+}
+
+std::optional<std::string> ContentDirectoryJson(
+    const std::wstring& json_path, const std::wstring& content_path,
+    std::wstring* error) {
+  const DWORD attributes = ::GetFileAttributesW(json_path.c_str());
+  if (attributes == INVALID_FILE_ATTRIBUTES) {
+    const DWORD last_error = ::GetLastError();
+    if (last_error == ERROR_FILE_NOT_FOUND ||
+        last_error == ERROR_PATH_NOT_FOUND) {
+      return "{\"ContentDir\":\"" + JsonEscapeUtf8(content_path) + "\"}";
+    }
+    *error = L"The existing installed_products JSON could not be read.";
+    return std::nullopt;
+  }
+  if ((attributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT)) !=
+      0) {
+    *error = L"The installed_products JSON target is not a regular file.";
+    return std::nullopt;
+  }
+  std::vector<std::uint8_t> bytes;
+  if (!ReadFileBytes(json_path, kMaximumRequestBytes, &bytes)) {
+    *error = L"The existing installed_products JSON could not be backed up.";
+    return std::nullopt;
+  }
+  const auto updated = UpdateContentDirectoryJson(bytes, content_path);
+  if (!updated.has_value()) {
+    *error = L"The existing installed_products JSON is invalid or unsupported.";
+    return std::nullopt;
+  }
+  return updated;
 }
 
 bool RegistryKeyExists(REGSAM view, const std::wstring& reg_key) {
@@ -783,9 +1019,11 @@ std::optional<std::vector<MutationPlan>> BuildPlans(
         *error = L"The ProductHints XML encoding is invalid.";
         return std::nullopt;
       }
+      const auto json = ContentDirectoryJson(
+          json_path, *operation.content_path, error);
+      if (!json.has_value()) return std::nullopt;
       plan.file_changes.push_back(FileChange{xml_path, *xml_utf8});
-      plan.file_changes.push_back(
-          FileChange{json_path, ContentDirectoryJson(*operation.content_path)});
+      plan.file_changes.push_back(FileChange{json_path, *json});
       plan.registry_strings = {
           {L"Name", operation.name},
           {L"RegKey", operation.reg_key},
@@ -808,8 +1046,10 @@ std::optional<std::vector<MutationPlan>> BuildPlans(
       plan.has_visibility = true;
       plan.visibility = static_cast<DWORD>(operation.visibility);
     } else if (operation.type == MutationType::kRelocate) {
-      plan.file_changes.push_back(
-          FileChange{json_path, ContentDirectoryJson(*operation.content_path)});
+      const auto json = ContentDirectoryJson(
+          json_path, *operation.content_path, error);
+      if (!json.has_value()) return std::nullopt;
+      plan.file_changes.push_back(FileChange{json_path, *json});
       plan.registry_strings = {
           {L"Name", operation.name},
           {L"RegKey", operation.reg_key},

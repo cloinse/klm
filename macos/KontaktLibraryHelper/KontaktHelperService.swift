@@ -142,29 +142,40 @@ enum MutationTransaction {
     }
     try validateProductHints(xml, name: name, regKey: regKey, snpid: snpid)
 
-    var plist: [String: Any] = [
-      "ContentDir": contentPath,
-      "RegKey": regKey,
-      "SNPID": snpid,
-      "Name": name,
-      "Visibility": object["visibility"] as? Int ?? 3,
-    ]
+    let existingPlist = existingPropertyList(at: plistURL)
+    var plist = existingPlist?.value ?? [:]
+    plist["ContentDir"] = contentPath
+    plist["RegKey"] = regKey
+    plist["SNPID"] = snpid
+    plist["Name"] = name
+    plist["Visibility"] = object["visibility"] as? Int ?? 3
     copyString("hu", to: "HU", from: object, into: &plist)
     copyString("jdx", to: "JDX", from: object, into: &plist)
     copyString("upid", to: "UPID", from: object, into: &plist)
     copyString("authSystem", to: "AuthSystem", from: object, into: &plist)
 
-    let plistData = try PropertyListSerialization.data(
-      fromPropertyList: plist,
-      format: .xml,
-      options: 0
+    let plistData = try serializePropertyList(
+      plist,
+      preserving: existingPlist
     )
-    let jsonData = try JSONSerialization.data(
-      withJSONObject: ["ContentDir": contentPath],
-      options: [.prettyPrinted, .sortedKeys]
-    )
-    guard let xmlData = xml.data(using: .utf8) else {
+    let existingJSON = existingJSONDictionary(at: jsonURL)
+    var json = existingJSON?.value ?? [:]
+    json["ContentDir"] = contentPath
+    let jsonData = try serializeJSON(json, preserving: existingJSON)
+    guard let candidateXMLData = xml.data(using: .utf8) else {
       throw MutationError.invalidRequest("ProductHints is not UTF-8")
+    }
+    let xmlData: Data
+    if let existingXMLData = try? Data(contentsOf: serviceURL),
+       productHintsMatch(
+         existingXMLData,
+         name: name,
+         regKey: regKey,
+         snpid: snpid
+       ) {
+      xmlData = existingXMLData
+    } else {
+      xmlData = candidateXMLData
     }
     return [
       FileMutation(url: serviceURL, data: xmlData),
@@ -185,14 +196,10 @@ enum MutationTransaction {
       throw MutationError.invalidRequest("invalid relocation path")
     }
 
+    let existingPlist = existingPropertyList(at: plistURL)
     var plist: [String: Any]
-    if let data = try? Data(contentsOf: plistURL),
-       let existing = try PropertyListSerialization.propertyList(
-         from: data,
-         options: [],
-         format: nil
-       ) as? [String: Any] {
-      plist = existing
+    if let existingPlist {
+      plist = existingPlist.value
     } else {
       guard let snpid = safeComponent(object["snpid"] as? String) else {
         throw MutationError.missingRecord(plistURL.path)
@@ -200,15 +207,14 @@ enum MutationTransaction {
       plist = ["Name": name, "RegKey": regKey, "SNPID": snpid]
     }
     plist["ContentDir"] = contentPath
-    let plistData = try PropertyListSerialization.data(
-      fromPropertyList: plist,
-      format: .xml,
-      options: 0
+    let plistData = try serializePropertyList(
+      plist,
+      preserving: existingPlist
     )
-    let jsonData = try JSONSerialization.data(
-      withJSONObject: ["ContentDir": contentPath],
-      options: [.prettyPrinted, .sortedKeys]
-    )
+    let existingJSON = existingJSONDictionary(at: jsonURL)
+    var json = existingJSON?.value ?? [:]
+    json["ContentDir"] = contentPath
+    let jsonData = try serializeJSON(json, preserving: existingJSON)
     return [
       FileMutation(url: plistURL, data: plistData),
       FileMutation(url: jsonURL, data: jsonData),
@@ -288,11 +294,20 @@ enum MutationTransaction {
     guard let value,
           value.utf8.count <= 4096,
           value.hasPrefix("/"),
+          !value.unicodeScalars.contains(
+            where: CharacterSet.controlCharacters.contains
+          ),
+          !value.split(separator: "/").contains(where: {
+            $0 == "." || $0 == ".."
+          }),
           FileManager.default.fileExists(atPath: value)
     else {
       return nil
     }
-    return URL(fileURLWithPath: value).standardizedFileURL.path
+    // The caller already resolves the selected directory. Preserve that exact
+    // representation so an unchanged /private/var path is not rewritten as
+    // /var and a healthy Native Access record remains byte-for-byte intact.
+    return value
   }
 
   private static func safeComponent(_ value: String?) -> String? {
@@ -321,6 +336,7 @@ enum MutationTransaction {
     let document = try XMLDocument(xmlString: xml, options: [.nodePreserveAll])
     let products = try document.nodes(forXPath: "/ProductHints/Product")
     guard products.count == 1,
+          isKontaktProductHints(document),
           try document.nodes(forXPath: "/ProductHints/Product/Name")
             .first?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) == name,
           try document.nodes(forXPath: "/ProductHints/Product/RegKey")
@@ -330,6 +346,117 @@ enum MutationTransaction {
     else {
       throw MutationError.invalidRequest("ProductHints fields do not match")
     }
+  }
+
+  private static func isKontaktProductHints(_ document: XMLDocument) -> Bool {
+    func values(_ xpath: String) -> [String] {
+      let nodes = (try? document.nodes(forXPath: xpath)) ?? []
+      return nodes.compactMap {
+        $0.stringValue?
+          .trimmingCharacters(in: .whitespacesAndNewlines)
+          .lowercased()
+      }.filter { !$0.isEmpty }
+    }
+
+    let type = values("/ProductHints/Product/Type").first
+    if type == "plugin" { return false }
+
+    if let poweredBy = values("/ProductHints/Product/PoweredBy").first {
+      return poweredBy.contains("kontakt")
+    }
+    let applications = values(
+      "/ProductHints/Product/Relevance/Application"
+    )
+    if !applications.isEmpty {
+      return applications.contains("kontakt")
+    }
+    if let icon = values("/ProductHints/Product/Icon").first,
+       icon.contains("kontakt") {
+      return true
+    }
+    return type == "content"
+  }
+
+  private static func productHintsMatch(
+    _ data: Data,
+    name: String,
+    regKey: String,
+    snpid: String
+  ) -> Bool {
+    guard data.count <= 2_000_000,
+          let xml = String(data: data, encoding: .utf8),
+          !xml.localizedCaseInsensitiveContains("<!DOCTYPE"),
+          !xml.localizedCaseInsensitiveContains("<!ENTITY")
+    else {
+      return false
+    }
+    do {
+      try validateProductHints(xml, name: name, regKey: regKey, snpid: snpid)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  private static func existingPropertyList(
+    at url: URL
+  ) -> (data: Data, value: [String: Any])? {
+    guard let data = try? Data(contentsOf: url),
+          let object = try? PropertyListSerialization.propertyList(
+            from: data,
+            options: [],
+            format: nil
+          ),
+          let value = object as? [String: Any]
+    else {
+      return nil
+    }
+    return (data, value)
+  }
+
+  private static func existingJSONDictionary(
+    at url: URL
+  ) -> (data: Data, value: [String: Any])? {
+    guard let data = try? Data(contentsOf: url),
+          let object = try? JSONSerialization.jsonObject(with: data),
+          let value = object as? [String: Any]
+    else {
+      return nil
+    }
+    return (data, value)
+  }
+
+  private static func serializePropertyList(
+    _ value: [String: Any],
+    preserving existing: (data: Data, value: [String: Any])?
+  ) throws -> Data {
+    if let existing,
+       NSDictionary(dictionary: existing.value).isEqual(
+         NSDictionary(dictionary: value)
+       ) {
+      return existing.data
+    }
+    return try PropertyListSerialization.data(
+      fromPropertyList: value,
+      format: .xml,
+      options: 0
+    )
+  }
+
+  private static func serializeJSON(
+    _ value: [String: Any],
+    preserving existing: (data: Data, value: [String: Any])?
+  ) throws -> Data {
+    if let existing,
+       NSDictionary(dictionary: existing.value).isEqual(
+         NSDictionary(dictionary: value)
+       ) {
+      return existing.data
+    }
+    return try JSONSerialization.data(
+      withJSONObject: value,
+      options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+    )
   }
 
   private static func copyString(

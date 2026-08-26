@@ -23,6 +23,8 @@ class InventoryAssembler {
     String? minimumKontaktVersion,
     int? visibility,
     int? userListIndex,
+    bool preferContentPath = false,
+    bool preferValues = false,
     required RegistrationSource source,
     List<LibraryIssue> issues = const <LibraryIssue>[],
   }) {
@@ -37,7 +39,16 @@ class InventoryAssembler {
           item.regKey != null &&
           _normalize(item.regKey!) == _normalize(cleanRegKey);
       final sameName = _normalize(item.name) == _normalize(cleanName);
-      if (sameRegKey || sameName) {
+      final nameMatchesExistingRegKey =
+          item.regKey != null &&
+          _normalize(item.regKey!) == _normalize(cleanName);
+      final regKeyMatchesExistingName =
+          cleanRegKey != null &&
+          _normalize(item.name) == _normalize(cleanRegKey);
+      if (sameRegKey ||
+          sameName ||
+          nameMatchesExistingRegKey ||
+          regKeyMatchesExistingName) {
         match = item;
         break;
       }
@@ -45,16 +56,34 @@ class InventoryAssembler {
 
     match ??= _MutableLibrary(name: cleanName)..regKey = cleanRegKey;
     if (!_items.contains(match)) _items.add(match);
+    final cleanContentPath = _clean(contentPath);
+    final cleanSnpid = _clean(snpid);
+    final cleanMinimumKontaktVersion = _clean(minimumKontaktVersion);
+    if (preferValues) {
+      match
+        ..name = cleanName
+        ..regKey = cleanRegKey ?? match.regKey
+        ..snpid = cleanSnpid ?? match.snpid
+        ..minimumKontaktVersion =
+            cleanMinimumKontaktVersion ?? match.minimumKontaktVersion
+        ..visibility = visibility ?? match.visibility
+        ..userListIndex = userListIndex ?? match.userListIndex;
+    } else {
+      match
+        ..name = match.name.isEmpty ? cleanName : match.name
+        ..regKey ??= cleanRegKey
+        ..snpid ??= cleanSnpid
+        ..minimumKontaktVersion ??= cleanMinimumKontaktVersion
+        ..visibility ??= visibility
+        ..userListIndex ??= userListIndex;
+    }
     match
-      ..name = match.name.isEmpty ? cleanName : match.name
-      ..regKey ??= cleanRegKey
-      ..snpid ??= _clean(snpid)
-      ..contentPath ??= _clean(contentPath)
-      ..minimumKontaktVersion ??= _clean(minimumKontaktVersion)
-      ..visibility ??= visibility
-      ..userListIndex ??= userListIndex
       ..sources.add(source)
       ..issues.addAll(issues);
+    if (cleanContentPath != null &&
+        (preferContentPath || match.contentPath == null)) {
+      match.contentPath = cleanContentPath;
+    }
   }
 
   List<KontaktLibrary> build() {

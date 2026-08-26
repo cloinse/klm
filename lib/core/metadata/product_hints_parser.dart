@@ -90,6 +90,8 @@ class ProductHintsParser {
       minimumKontaktVersion: minimumVersion,
       productType: _nullable(_value(product, 'Type')),
       company: _nullable(_value(product, 'Company')),
+      poweredBy: _nullable(_value(product, 'PoweredBy')),
+      icon: _nullable(_value(product, 'Icon')),
       applications: Set<String>.unmodifiable(applications),
     );
     final serializedXml = document.toXmlString(pretty: true, indent: '  ');

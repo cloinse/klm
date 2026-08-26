@@ -31,6 +31,16 @@ void main() {
     expect(appInfo, isNot(contains('Juan Ayala')));
   });
 
+  test('macOS declares access to external library volumes', () {
+    final infoPlist = File('macos/Runner/Info.plist').readAsStringSync();
+
+    expect(
+      infoPlist,
+      contains('<key>NSRemovableVolumesUsageDescription</key>'),
+    );
+    expect(infoPlist, contains('<key>NSNetworkVolumesUsageDescription</key>'));
+  });
+
   test('Codemagic packages exactly three macOS release files in one ZIP', () {
     final codemagic = File('codemagic.yaml').readAsStringSync();
     final packager = File('tool/package_macos_dmg.sh').readAsStringSync();
