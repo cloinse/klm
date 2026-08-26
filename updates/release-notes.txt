@@ -1,1 +1,5 @@
-- Performance and security improvements.
+- Prioritized Kontakt application markers over conflicting PoweredBy metadata.
+- Added permission-aware inventory and content-path validation.
+- Hardened native mutations with integrity checks, safe-path validation, and rollback.
+- Preserved existing installed_products metadata when updating ContentDir.
+- Added automated Windows packaging and signed appcast publishing.
