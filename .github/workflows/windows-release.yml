@@ -1,0 +1,138 @@
+name: Windows release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows-release:
+    name: Build and publish Windows installer
+    runs-on: windows-2022
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Flutter 3.38.9
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.9'
+          channel: stable
+          cache: true
+
+      - name: Install Flutter dependencies
+        shell: pwsh
+        run: |
+          flutter config --enable-windows-desktop
+          flutter pub get
+
+      - name: Install pinned release tools
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $toolsRoot = Join-Path $env:RUNNER_TEMP 'klm-tools'
+          $innoRoot = Join-Path $toolsRoot 'inno-7.0.2'
+          $winSparkleRoot = Join-Path $toolsRoot 'winsparkle-0.9.4'
+          New-Item -ItemType Directory -Force -Path $toolsRoot | Out-Null
+
+          $innoInstaller = Join-Path $env:RUNNER_TEMP 'innosetup-7.0.2-x64.exe'
+          Invoke-WebRequest `
+            -Uri 'https://github.com/jrsoftware/issrc/releases/download/is-7_0_2/innosetup-7.0.2-x64.exe' `
+            -OutFile $innoInstaller
+          $innoHash = (Get-FileHash -LiteralPath $innoInstaller -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($innoHash -ne '5ad54ca3def786f8f4212552e54cc6d8d61329e2d24a1cfee0571d42c2684ff1') {
+            throw "Inno Setup checksum mismatch: $innoHash"
+          }
+          New-Item -ItemType Directory -Force -Path $innoRoot | Out-Null
+          $innoProcess = Start-Process `
+            -FilePath $innoInstaller `
+            -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$innoRoot") `
+            -Wait `
+            -PassThru
+          if ($innoProcess.ExitCode -ne 0) {
+            throw "Inno Setup installer failed with exit code $($innoProcess.ExitCode)."
+          }
+          if (-not (Test-Path -LiteralPath (Join-Path $innoRoot 'ISCC.exe') -PathType Leaf)) {
+            throw "Inno Setup compiler was not installed at $innoRoot."
+          }
+
+          $winSparkleArchive = Join-Path $env:RUNNER_TEMP 'WinSparkle-0.9.4.zip'
+          Invoke-WebRequest `
+            -Uri 'https://github.com/vslavik/winsparkle/releases/download/v0.9.4/WinSparkle-0.9.4.zip' `
+            -OutFile $winSparkleArchive
+          $winSparkleHash = (Get-FileHash -LiteralPath $winSparkleArchive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($winSparkleHash -ne '6037df37fc263bd1650a1c4949681a9d40ffe991d01f35892a406cb5d103c976') {
+            throw "WinSparkle checksum mismatch: $winSparkleHash"
+          }
+          $winSparkleExtract = Join-Path $env:RUNNER_TEMP 'winsparkle-extract'
+          if (Test-Path -LiteralPath $winSparkleExtract) {
+            Remove-Item -LiteralPath $winSparkleExtract -Recurse -Force
+          }
+          Expand-Archive -LiteralPath $winSparkleArchive -DestinationPath $winSparkleExtract
+          $winSparklePackageRoot = Join-Path $winSparkleExtract 'WinSparkle-0.9.4'
+          New-Item -ItemType Directory -Force -Path $winSparkleRoot | Out-Null
+          Copy-Item `
+            (Join-Path $winSparklePackageRoot 'x64\Release\WinSparkle.dll') `
+            (Join-Path $winSparkleRoot 'WinSparkle.dll') `
+            -Force
+          Copy-Item `
+            (Join-Path $winSparklePackageRoot 'bin\winsparkle-tool.exe') `
+            (Join-Path $winSparkleRoot 'winsparkle-tool.exe') `
+            -Force
+
+          foreach ($requiredFile in @(
+              (Join-Path $innoRoot 'ISCC.exe'),
+              (Join-Path $winSparkleRoot 'WinSparkle.dll'),
+              (Join-Path $winSparkleRoot 'winsparkle-tool.exe')
+            )) {
+            if (-not (Test-Path -LiteralPath $requiredFile -PathType Leaf)) {
+              throw "Release tool file is missing: $requiredFile"
+            }
+          }
+
+      - name: Prepare Sparkle signing key
+        shell: pwsh
+        env:
+          KLM_SPARKLE_PRIVATE_KEY: ${{ secrets.KLM_SPARKLE_PRIVATE_KEY }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ([string]::IsNullOrWhiteSpace($env:KLM_SPARKLE_PRIVATE_KEY)) {
+            throw 'The KLM_SPARKLE_PRIVATE_KEY repository secret is missing.'
+          }
+          $secretDirectory = Join-Path $env:GITHUB_WORKSPACE '.secrets'
+          New-Item -ItemType Directory -Force -Path $secretDirectory | Out-Null
+          $secretPath = Join-Path $secretDirectory 'KLM_SPARKLE_PRIVATE_KEY'
+          $encoding = [Text.UTF8Encoding]::new($false)
+          [IO.File]::WriteAllText(
+            $secretPath,
+            $env:KLM_SPARKLE_PRIVATE_KEY.Trim() + [Environment]::NewLine,
+            $encoding
+          )
+
+      - name: Build and publish Windows release
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          KLM_RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = $env:KLM_RELEASE_TAG
+          $toolsRoot = Join-Path $env:RUNNER_TEMP 'klm-tools'
+          & .\tool\build_windows_release.ps1 `
+            -Publish `
+            -Tag $tag `
+            -FlutterRoot $env:FLUTTER_ROOT `
+            -ToolsRoot $toolsRoot
