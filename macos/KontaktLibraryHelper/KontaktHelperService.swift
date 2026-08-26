@@ -361,14 +361,14 @@ enum MutationTransaction {
     let type = values("/ProductHints/Product/Type").first
     if type == "plugin" { return false }
 
-    if let poweredBy = values("/ProductHints/Product/PoweredBy").first {
-      return poweredBy.contains("kontakt")
-    }
     let applications = values(
       "/ProductHints/Product/Relevance/Application"
     )
     if !applications.isEmpty {
       return applications.contains("kontakt")
+    }
+    if let poweredBy = values("/ProductHints/Product/PoweredBy").first {
+      return poweredBy.contains("kontakt")
     }
     if let icon = values("/ProductHints/Product/Icon").first,
        icon.contains("kontakt") {

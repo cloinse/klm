@@ -161,17 +161,17 @@ class ProductMetadata {
     final normalizedType = productType?.trim().toLowerCase();
     if (normalizedType == 'plugin') return false;
 
-    final normalizedPoweredBy = poweredBy?.trim().toLowerCase();
-    if (normalizedPoweredBy?.isNotEmpty == true) {
-      return normalizedPoweredBy!.contains('kontakt');
-    }
-
     final normalizedApplications = applications
         .map((application) => application.trim().toLowerCase())
         .where((application) => application.isNotEmpty)
         .toSet();
     if (normalizedApplications.isNotEmpty) {
       return normalizedApplications.contains('kontakt');
+    }
+
+    final normalizedPoweredBy = poweredBy?.trim().toLowerCase();
+    if (normalizedPoweredBy?.isNotEmpty == true) {
+      return normalizedPoweredBy!.contains('kontakt');
     }
 
     final normalizedIcon = icon?.trim().toLowerCase();

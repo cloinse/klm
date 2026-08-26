@@ -55,6 +55,27 @@ void main() {
     );
   });
 
+  test(
+    'accepts Kontakt libraries powered by another Native Instruments app',
+    () async {
+      final directory = await Directory.systemTemp.createTemp('klm-maschine-');
+      addTearDown(() => directory.delete(recursive: true));
+      await File('${directory.path}/Noire.nicnt').writeAsString('''
+<ProductHints spec="1.0.16"><Product version="1">
+  <Name>Noire</Name><Type>Content</Type>
+  <Relevance><Application minVersion="5.6.8.0">kontakt</Application></Relevance>
+  <PoweredBy>Maschine</PoweredBy><SNPID>K07</SNPID><RegKey>Noire</RegKey>
+  <Icon>kontakt</Icon>
+</Product></ProductHints>
+''');
+
+      final candidates = await scanner.scanDirectory(directory.path);
+
+      expect(candidates.single.metadata.name, 'Noire');
+      expect(candidates.single.metadata.applications, contains('kontakt'));
+    },
+  );
+
   test('rejects unsafe names before creating a mutation request', () async {
     final directory = await Directory.systemTemp.createTemp('klm-unsafe-');
     addTearDown(() => directory.delete(recursive: true));
