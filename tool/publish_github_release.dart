@@ -12,20 +12,34 @@ Future<void> main(List<String> arguments) async {
       return;
     }
 
-    final tag = Platform.environment['CM_TAG']?.trim();
+    final codemagicTag = Platform.environment['CM_TAG']?.trim();
+    final tag = options.tag ?? codemagicTag;
     if (tag == null || tag.isEmpty) {
-      stdout.writeln('GitHub publishing skipped: this is not a tag build.');
+      stdout.writeln(
+        'GitHub publishing skipped: provide --tag for a local release '
+        'or run a Codemagic tag build.',
+      );
       return;
+    }
+    if (codemagicTag != null &&
+        codemagicTag.isNotEmpty &&
+        codemagicTag != tag) {
+      throw StateError(
+        'Codemagic tag $codemagicTag does not match the requested tag $tag.',
+      );
     }
     if (tag != 'v${options.version}') {
       throw StateError(
-        'Codemagic tag $tag does not match version ${options.version}.',
+        'Release tag $tag does not match version ${options.version}.',
       );
     }
 
-    final token = Platform.environment['GITHUB_TOKEN']?.trim();
+    final token = await _loadGitHubToken();
     if (token == null || token.isEmpty) {
-      throw StateError('GITHUB_TOKEN is required for tag builds.');
+      throw StateError(
+        'Configure GITHUB_TOKEN or create .secrets/GITHUB_TOKEN for '
+        'local publishing.',
+      );
     }
     final repository =
         Platform.environment['GITHUB_REPOSITORY']?.trim().isNotEmpty == true
@@ -78,6 +92,7 @@ String formatGitHubReleaseNotes(String version, String? notes) {
 const _usage = r'''Usage:
   dart run tool/publish_github_release.dart \
     --version <version> \
+    --tag <vX.Y.Z> \
     --appcast <generated-appcast.xml> \
     --repository-appcast-path updates/appcast-<platform>.xml \
     --asset <installer> \
@@ -85,10 +100,16 @@ const _usage = r'''Usage:
     [--release-notes updates/release-notes.txt] \
     [--title <release-title>]
 
-Required environment variables on tag builds:
-  CM_TAG          The tag being built, for example v0.2.8.
+Required environment variables:
   GITHUB_TOKEN    Fine-grained token with Contents: write permission.
   GITHUB_REPOSITORY (optional, defaults to cloinse/klm).
+
+Local project fallback:
+  .secrets/GITHUB_TOKEN  One-line token file; this directory is ignored by Git.
+
+Tag selection:
+  CM_TAG          The Codemagic tag being built, for example v0.2.8.
+  --tag           The explicit release tag for local publishing.
 
 The appcast is committed to the repository path and is not uploaded as a
 GitHub Release asset. Release assets are limited to the installer and SHA-256
@@ -98,6 +119,7 @@ file supplied with --asset.
 class _Options {
   const _Options({
     required this.version,
+    required this.tag,
     required this.appcastPath,
     required this.repositoryAppcastPath,
     required this.assetPaths,
@@ -106,6 +128,7 @@ class _Options {
   });
 
   final String version;
+  final String? tag;
   final String appcastPath;
   final String repositoryAppcastPath;
   final List<String> assetPaths;
@@ -116,6 +139,7 @@ class _Options {
     if (arguments.isEmpty || arguments.contains('--help')) return null;
 
     String? version;
+    String? tag;
     String? appcastPath;
     String? repositoryAppcastPath;
     String? releaseNotesPath;
@@ -136,6 +160,11 @@ class _Options {
             throw const FormatException('Duplicate --version.');
           }
           version = value;
+        case '--tag':
+          if (tag != null) {
+            throw const FormatException('Duplicate --tag.');
+          }
+          tag = value;
         case '--appcast':
           if (appcastPath != null) {
             throw const FormatException('Duplicate --appcast.');
@@ -187,6 +216,7 @@ class _Options {
 
     return _Options(
       version: version,
+      tag: tag,
       appcastPath: appcastPath,
       repositoryAppcastPath: repositoryAppcastPath,
       assetPaths: assetPaths,
@@ -209,6 +239,18 @@ Future<String?> _readOptionalFile(String? path) async {
     );
   }
   return value.isEmpty ? null : value;
+}
+
+Future<String?> _loadGitHubToken() async {
+  final environmentToken = Platform.environment['GITHUB_TOKEN']?.trim();
+  if (environmentToken != null && environmentToken.isNotEmpty) {
+    return environmentToken;
+  }
+
+  final localTokenFile = File('.secrets/GITHUB_TOKEN');
+  if (!await localTokenFile.exists()) return null;
+  final localToken = (await localTokenFile.readAsString()).trim();
+  return localToken.isEmpty ? null : localToken;
 }
 
 Future<void> _validateFiles(List<File> files) async {
@@ -451,7 +493,7 @@ class _GitHubClient {
     request.headers.set('Accept', 'application/vnd.github+json');
     request.headers.set('Authorization', 'Bearer $token');
     request.headers.set('X-GitHub-Api-Version', _githubApiVersion);
-    request.headers.set('User-Agent', 'kontakt-library-manager-codemagic');
+    request.headers.set('User-Agent', 'kontakt-library-manager-release');
   }
 
   static ContentType _contentTypeFor(String name) {

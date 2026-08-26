@@ -18,10 +18,11 @@ The in-app update dialog displays the plain-text contents of:
 updates/release-notes.txt
 ```
 
-Add the bullet list for the release before starting either Codemagic release
-workflow. The shared appcast generator embeds that file as the appcast item's
-description; macOS signs the appcast after embedding it. If the file is absent,
-the update still works but the dialog has no changes section.
+Add the bullet list for the release before starting a release workflow or the
+local Windows release script. The shared appcast generator embeds that file as
+the appcast item's description; macOS signs the appcast after embedding it. If
+the file is absent, the update still works but the dialog has no changes
+section.
 
 ## Distribution rules
 
@@ -47,8 +48,8 @@ the update still works but the dialog has no changes section.
 - WinSparkle validates the installer with the same EdDSA key used by Sparkle on
   macOS. The native updater closes KLM before Inno Setup replaces its files,
   then the installer relaunches KLM with the original non-elevated user.
-- The Codemagic Windows workflow pins and verifies WinSparkle 0.9.4 and Inno
-  Setup 7.0.2, and caches both tools between builds.
+- The local Windows release script uses WinSparkle 0.9.4 and Inno Setup 7.0.2
+  from the pinned developer tool locations before packaging the installer.
 
 ## Private key
 
@@ -108,8 +109,8 @@ The Release title remains the version tag (`vX.Y.Z`). Its body is generated with
 a bold `What's new in vX.Y.Z?` heading followed by the Markdown bullet list in
 `updates/release-notes.txt`; the notes file remains unchanged so the same text
 continues to feed the in-app update dialog and appcast.
-This automation intentionally applies only to macOS; Windows publishing uses
-its separate workflow.
+This automation intentionally applies only to macOS; Windows publishing is
+available through the local release script described below.
 
 Configure a fine-grained GitHub token for `cloinse/klm` with repository
 `Contents: Read and write` permission. Add it to the Codemagic secret group
@@ -135,20 +136,32 @@ git push origin v0.2.8
 5. Verify the generated assets and appcast in GitHub before announcing the
    release.
 
-## Publishing a Windows update
+## Publishing a Windows update locally
 
-1. Increase the version and build number in `pubspec.yaml`.
-2. Run the `windows-release` Codemagic workflow.
-3. Download `klm-windows-vX.Y.Z.zip`. It contains one folder with exactly the
-   setup executable, its SHA-256 file, and `appcast-windows.xml`.
-4. Publish the setup executable and SHA-256 file in the matching GitHub Release.
-5. Copy the generated `appcast-windows.xml` to:
+1. Increase the version and build number in `pubspec.yaml` and update
+   `updates/release-notes.txt`.
+2. Commit and push the release changes to `main`.
+3. Create `.secrets/GITHUB_TOKEN` with the same token used by Codemagic, one
+   line without quotes. `.secrets/` is ignored by Git. The token must have
+   repository `Contents: Read and write` permission; never pass it as a
+   command-line argument.
+4. From the repository root, run:
 
-```text
-updates/appcast-windows.xml
+```powershell
+.\tool\build_windows_release.ps1 -Publish -Tag vX.Y.Z
 ```
 
-Commit the appcast without editing it. Existing Windows installations will
-then show the same persistent in-app update notice used on macOS. Clicking it
-opens the shared version dialog. After confirmation, WinSparkle verifies,
-downloads, and runs the installer.
+The script runs analysis, tests, the Windows Release build, Inno Setup, SHA-256
+generation, and signed appcast generation. With `-Publish`, it creates or
+updates the matching GitHub Release with exactly the setup executable and its
+SHA-256 file, then commits the generated `appcast-windows.xml` to
+`updates/appcast-windows.xml` on `main` through the GitHub API. The tag defaults
+to the version in `pubspec.yaml` when `-Tag` is omitted.
+
+Without `-Publish`, the same command only generates the local package at
+`build/windows-release/klm-windows-vX.Y.Z/`, containing exactly the setup
+executable, its SHA-256 file, and `appcast-windows.xml`.
+
+Existing Windows installations then discover the release through the updated
+appcast. Clicking the notice opens the shared version dialog; after
+confirmation, WinSparkle verifies, downloads, and runs the installer.
