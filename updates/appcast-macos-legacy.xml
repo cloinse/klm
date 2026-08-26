@@ -4,18 +4,22 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     <channel>
         <title>Kontakt Library Manager</title>
         <item>
-            <title>0.2.9</title>
-            <pubDate>Tue, 25 Aug 2026 21:39:40 +0000</pubDate>
-            <sparkle:version>21</sparkle:version>
-            <sparkle:shortVersionString>0.2.9</sparkle:shortVersionString>
+            <title>0.3.0</title>
+            <pubDate>Wed, 26 Aug 2026 17:37:58 +0000</pubDate>
+            <sparkle:version>22</sparkle:version>
+            <sparkle:shortVersionString>0.3.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>10.15</sparkle:minimumSystemVersion>
                   <description sparkle:format="plain-text"><![CDATA[
-- Performance and security improvements.
+- Prioritized Kontakt application markers over conflicting PoweredBy metadata.
+- Added permission-aware inventory and content-path validation.
+- Hardened native mutations with integrity checks, safe-path validation, and rollback.
+- Preserved existing installed_products metadata when updating ContentDir.
+- Added automated Windows packaging and signed appcast publishing.
 ]]></description>
-<enclosure url="https://github.com/cloinse/klm/releases/download/v0.2.9/klm-macos-v0.2.9.dmg" length="21785710" type="application/octet-stream" sparkle:edSignature="PxYaBND55KXmoPATnbuc9gLFjwBu72Eg3ZgC2+i7DofNFXHCAOToWryWqdakx/CDk2p9QM3ymVLteZ/AgLtUAg=="></enclosure>
+<enclosure url="https://github.com/cloinse/klm/releases/download/v0.3.0/klm-macos-v0.3.0.dmg" length="21813333" type="application/octet-stream" sparkle:edSignature="IZyLwstZVcLrRxMSwREkddYFF9u9PN11I826uO1+933UMpAj5jjnrP5jS0O5wdkT0QTIOosY/q4ErJDGPF9pAQ=="></enclosure>
         </item>
     </channel>
 </rss><!-- sparkle-signatures:
-edSignature: fGAQb6E03BPXXvqeYf43yumVOE//kBWT+h7UxK4iL4N7jbbLP6mxAC99TAokZl+HUhnD9j0NmyYWDiwPwb3yBg==
-length: 1171
+edSignature: cfnPf6l9iZ8eRdGp/3FKuM+ygUlpbmQf8idFu9W38GbPIBPB2+/AAwK+j2tGheprHmg4lRq+u8VUpGwe7b7sAA==
+length: 1502
 -->
