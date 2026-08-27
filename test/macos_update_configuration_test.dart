@@ -42,7 +42,11 @@ void main() {
   });
 
   test('Codemagic packages exactly three macOS release files in one ZIP', () {
-    final codemagic = File('codemagic.yaml').readAsStringSync();
+    // Git may check this YAML out with CRLF on Windows. Normalize it before
+    // checking multiline snippets so the configuration test is platform
+    // independent.
+    final codemagic =
+        File('codemagic.yaml').readAsStringSync().replaceAll('\r\n', '\n');
     final packager = File('tool/package_macos_dmg.sh').readAsStringSync();
     final background = File(
       'tool/create_dmg_background.swift',
