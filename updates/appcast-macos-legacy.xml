@@ -4,22 +4,19 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     <channel>
         <title>Kontakt Library Manager</title>
         <item>
-            <title>0.3.0</title>
-            <pubDate>Wed, 26 Aug 2026 17:37:58 +0000</pubDate>
-            <sparkle:version>22</sparkle:version>
-            <sparkle:shortVersionString>0.3.0</sparkle:shortVersionString>
+            <title>0.3.1</title>
+            <pubDate>Thu, 27 Aug 2026 03:41:38 +0000</pubDate>
+            <sparkle:version>23</sparkle:version>
+            <sparkle:shortVersionString>0.3.1</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>10.15</sparkle:minimumSystemVersion>
                   <description sparkle:format="plain-text"><![CDATA[
-- Prioritized Kontakt application markers over conflicting PoweredBy metadata.
-- Added permission-aware inventory and content-path validation.
-- Hardened native mutations with integrity checks, safe-path validation, and rollback.
-- Preserved existing installed_products metadata when updating ContentDir.
-- Added automated Windows packaging and signed appcast publishing.
+- Fixed multi-library dragging.
+- Improved library path updates on macOS and Windows.
 ]]></description>
-<enclosure url="https://github.com/cloinse/klm/releases/download/v0.3.0/klm-macos-v0.3.0.dmg" length="21813333" type="application/octet-stream" sparkle:edSignature="IZyLwstZVcLrRxMSwREkddYFF9u9PN11I826uO1+933UMpAj5jjnrP5jS0O5wdkT0QTIOosY/q4ErJDGPF9pAQ=="></enclosure>
+<enclosure url="https://github.com/cloinse/klm/releases/download/v0.3.1/klm-macos-v0.3.1.dmg" length="21831408" type="application/octet-stream" sparkle:edSignature="6VEBpW12gkzi1N0v7SkQCvGLPnb+cfCEosoVlI1kggSVyg5oh1tNZQ1RcDMQIBrBwDgv0Ugqxh1VXb2wN/waDg=="></enclosure>
         </item>
     </channel>
 </rss><!-- sparkle-signatures:
-edSignature: cfnPf6l9iZ8eRdGp/3FKuM+ygUlpbmQf8idFu9W38GbPIBPB2+/AAwK+j2tGheprHmg4lRq+u8VUpGwe7b7sAA==
-length: 1502
+edSignature: kpK+wpsYXoVqIAnd8OU/+7OwyUG+/PZ5Akgq9C6j5cve9Xl0hEkGpZKwc8LYFldVlvbk0ZwkNcWpKnMcbruYBg==
+length: 1216
 -->
