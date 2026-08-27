@@ -3,23 +3,20 @@
   <channel>
     <title>Kontakt Library Manager - Windows</title>
     <item>
-      <title>0.3.0</title>
-      <pubDate>Wed, 26 Aug 2026 17:44:40 GMT</pubDate>
-      <sparkle:version>22</sparkle:version>
-      <sparkle:shortVersionString>0.3.0</sparkle:shortVersionString>
+      <title>0.3.1</title>
+      <pubDate>Thu, 27 Aug 2026 03:52:39 GMT</pubDate>
+      <sparkle:version>23</sparkle:version>
+      <sparkle:shortVersionString>0.3.1</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>10.0</sparkle:minimumSystemVersion>
-      <description sparkle:format="plain-text"><![CDATA[- Prioritized Kontakt application markers over conflicting PoweredBy metadata.
-- Added permission-aware inventory and content-path validation.
-- Hardened native mutations with integrity checks, safe-path validation, and rollback.
-- Preserved existing installed_products metadata when updating ContentDir.
-- Added automated Windows packaging and signed appcast publishing.]]></description>
+      <description sparkle:format="plain-text"><![CDATA[- Fixed multi-library dragging.
+- Improved library path updates on macOS and Windows.]]></description>
       <enclosure
-        url="https://github.com/cloinse/klm/releases/download/v0.3.0/klm-windows-v0.3.0.exe"
-        length="14937713"
+        url="https://github.com/cloinse/klm/releases/download/v0.3.1/klm-windows-v0.3.1.exe"
+        length="14152790"
         type="application/octet-stream"
         sparkle:os="windows-x64"
         sparkle:installerArguments="/SILENT /SP- /NOICONS /NORESTART"
-        sparkle:edSignature="OgwDU1nuzlFWphBlmwcgskfU7D1dhAeXqwtqd3ME5OwvGTmGBgujQgrHulQ+pfmwu+dbtSTLZG0+KXKwO9wXBQ=="
+        sparkle:edSignature="pPl7D2kUeM+VbtXw4ID0VFZZpPKeuJ3XyYJxVLF0Y/b6fpuKc5SuUEyTWahfuYy5Q29nVq3ki97zd9vhxqKSAw=="
       />
     </item>
   </channel>
