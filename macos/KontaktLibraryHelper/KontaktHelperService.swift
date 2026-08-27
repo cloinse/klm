@@ -1,5 +1,7 @@
 import Foundation
 
+private let maximumInstalledProductsJSONSize = 2_500_000
+
 private enum MutationError: LocalizedError {
   case invalidRequest(String)
   case unsafePath(String)
@@ -158,10 +160,14 @@ enum MutationTransaction {
       plist,
       preserving: existingPlist
     )
-    let existingJSON = existingJSONDictionary(at: jsonURL)
+    let existingJSON = try existingJSONDictionary(at: jsonURL)
     var json = existingJSON?.value ?? [:]
     json["ContentDir"] = contentPath
-    let jsonData = try serializeJSON(json, preserving: existingJSON)
+    let jsonData = try serializeJSON(
+      json,
+      preserving: existingJSON,
+      contentPath: contentPath
+    )
     guard let candidateXMLData = xml.data(using: .utf8) else {
       throw MutationError.invalidRequest("ProductHints is not UTF-8")
     }
@@ -211,10 +217,14 @@ enum MutationTransaction {
       plist,
       preserving: existingPlist
     )
-    let existingJSON = existingJSONDictionary(at: jsonURL)
+    let existingJSON = try existingJSONDictionary(at: jsonURL)
     var json = existingJSON?.value ?? [:]
     json["ContentDir"] = contentPath
-    let jsonData = try serializeJSON(json, preserving: existingJSON)
+    let jsonData = try serializeJSON(
+      json,
+      preserving: existingJSON,
+      contentPath: contentPath
+    )
     return [
       FileMutation(url: plistURL, data: plistData),
       FileMutation(url: jsonURL, data: jsonData),
@@ -416,12 +426,64 @@ enum MutationTransaction {
 
   private static func existingJSONDictionary(
     at url: URL
-  ) -> (data: Data, value: [String: Any])? {
-    guard let data = try? Data(contentsOf: url),
-          let object = try? JSONSerialization.jsonObject(with: data),
+  ) throws -> (data: Data, value: [String: Any])? {
+    guard FileManager.default.fileExists(atPath: url.path) else {
+      return nil
+    }
+
+    try rejectSymbolicLinks(in: url)
+    var isDirectory: ObjCBool = false
+    guard FileManager.default.fileExists(
+      atPath: url.path,
+      isDirectory: &isDirectory
+    ), !isDirectory.boolValue else {
+      throw MutationError.invalidRequest(
+        "The installed_products JSON target is not a regular file."
+      )
+    }
+
+    guard let attributes = try? FileManager.default.attributesOfItem(
+      atPath: url.path
+    ),
+    let size = (attributes[.size] as? NSNumber)?.int64Value,
+    size >= 0,
+    size <= Int64(maximumInstalledProductsJSONSize)
+    else {
+      throw MutationError.invalidRequest(
+        "The existing installed_products JSON could not be backed up."
+      )
+    }
+
+    guard let data = try? Data(contentsOf: url) else {
+      throw MutationError.invalidRequest(
+        "The existing installed_products JSON could not be read."
+      )
+    }
+    guard data.count <= maximumInstalledProductsJSONSize else {
+      throw MutationError.invalidRequest(
+        "The existing installed_products JSON could not be backed up."
+      )
+    }
+
+    // JSONSerialization does not consistently accept an UTF-8 BOM across
+    // supported macOS releases. Windows accepts one, so remove it only for
+    // validation while retaining the original bytes for the patch below.
+    let validationData: Data
+    if data.count >= 3,
+       data[data.startIndex] == 0xEF,
+       data[data.startIndex + 1] == 0xBB,
+       data[data.startIndex + 2] == 0xBF {
+      validationData = data.dropFirst(3)
+    } else {
+      validationData = data
+    }
+
+    guard let object = try? JSONSerialization.jsonObject(with: validationData),
           let value = object as? [String: Any]
     else {
-      return nil
+      throw MutationError.invalidRequest(
+        "The existing installed_products JSON is invalid or unsupported."
+      )
     }
     return (data, value)
   }
@@ -445,7 +507,8 @@ enum MutationTransaction {
 
   private static func serializeJSON(
     _ value: [String: Any],
-    preserving existing: (data: Data, value: [String: Any])?
+    preserving existing: (data: Data, value: [String: Any])?,
+    contentPath: String
   ) throws -> Data {
     if let existing,
        NSDictionary(dictionary: existing.value).isEqual(
@@ -453,9 +516,24 @@ enum MutationTransaction {
        ) {
       return existing.data
     }
-    return try JSONSerialization.data(
-      withJSONObject: value,
-      options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+
+    if let existing {
+      guard let patched = JSONContentDirectoryPatcher.update(
+        existing.data,
+        contentPath: contentPath
+      ) else {
+        throw MutationError.invalidRequest(
+          "The existing installed_products JSON is invalid or unsupported."
+        )
+      }
+      return patched
+    }
+
+    // A missing installed_products record has no fields to preserve. Keep the
+    // same compact representation emitted by the Windows native helper.
+    return Data(
+      "{\"ContentDir\":\"\(JSONContentDirectoryPatcher.escape(contentPath))\"}"
+        .utf8
     )
   }
 
@@ -468,6 +546,288 @@ enum MutationTransaction {
     if let value = source[sourceKey] as? String, !value.isEmpty {
       destination[destinationKey] = value
     }
+  }
+}
+
+/// Replaces the ContentDir member in an existing JSON object without
+/// reserializing the document. This intentionally mirrors the Windows native
+/// helper: only JSON whitespace and string syntax are parsed, while every
+/// other byte is retained exactly as it was on disk.
+private enum JSONContentDirectoryPatcher {
+  private struct ParsedString {
+    let end: Int
+    let value: String
+  }
+
+  static func update(_ data: Data, contentPath: String) -> Data? {
+    var bytes = Array(data)
+    var root = skipWhitespace(bytes, from: 0)
+    if bytes.count >= 3,
+       bytes[0] == 0xEF,
+       bytes[1] == 0xBB,
+       bytes[2] == 0xBF {
+      root = skipWhitespace(bytes, from: 3)
+    }
+    guard root < bytes.count, bytes[root] == Character("{").asciiValue else {
+      return nil
+    }
+
+    let replacement = Array(
+      "\"\(escape(contentPath))\"".utf8
+    )
+    var position = root + 1
+    var hasMember = false
+    var foundContentDirectory = false
+    var expectMember = false
+    var closingBrace: Int?
+
+    while true {
+      position = skipWhitespace(bytes, from: position)
+      guard position < bytes.count else { return nil }
+      if bytes[position] == Character("}").asciiValue {
+        if expectMember { return nil }
+        closingBrace = position
+        break
+      }
+
+      guard let key = parseString(bytes, from: position) else {
+        return nil
+      }
+      let keyStart = position
+      var keyEnd = key.end
+      if key.value == "contentDir" {
+        let canonicalKey = Array("\"ContentDir\"".utf8)
+        bytes.replaceSubrange(keyStart..<keyEnd, with: canonicalKey)
+        keyEnd = keyStart + canonicalKey.count
+      }
+      position = skipWhitespace(bytes, from: keyEnd)
+      guard position < bytes.count,
+            bytes[position] == Character(":").asciiValue
+      else {
+        return nil
+      }
+      position = skipWhitespace(bytes, from: position + 1)
+      let valueStart = position
+      guard let valueEnd = skipValue(bytes, from: valueStart) else {
+        return nil
+      }
+
+      expectMember = false
+      if key.value == "ContentDir" || key.value == "contentDir" {
+        if foundContentDirectory { return nil }
+        foundContentDirectory = true
+        bytes.replaceSubrange(valueStart..<valueEnd, with: replacement)
+        position = valueStart + replacement.count
+      } else {
+        position = valueEnd
+      }
+      hasMember = true
+      position = skipWhitespace(bytes, from: position)
+      guard position < bytes.count else { return nil }
+      if bytes[position] == Character(",").asciiValue {
+        position += 1
+        expectMember = true
+        continue
+      }
+      if bytes[position] == Character("}").asciiValue {
+        expectMember = false
+        closingBrace = position
+        break
+      }
+      return nil
+    }
+
+    guard let closingBrace,
+          skipWhitespace(bytes, from: closingBrace + 1) == bytes.count
+    else {
+      return nil
+    }
+
+    if !foundContentDirectory {
+      var insertion = [UInt8]()
+      if hasMember { insertion.append(Character(",").asciiValue!) }
+      insertion.append(contentsOf: "\"ContentDir\":\"".utf8)
+      insertion.append(contentsOf: escape(contentPath).utf8)
+      insertion.append(Character("\"").asciiValue!)
+      bytes.insert(contentsOf: insertion, at: closingBrace)
+    }
+    return Data(bytes)
+  }
+
+  static func escape(_ value: String) -> String {
+    let hex = Array("0123456789abcdef".utf8)
+    var escaped = [UInt8]()
+    escaped.reserveCapacity(value.utf8.count + 8)
+    for byte in value.utf8 {
+      switch byte {
+      case 0x22:
+        escaped.append(contentsOf: [0x5C, 0x22])
+      case 0x5C:
+        escaped.append(contentsOf: [0x5C, 0x5C])
+      case 0x08:
+        escaped.append(contentsOf: [0x5C, 0x62])
+      case 0x0C:
+        escaped.append(contentsOf: [0x5C, 0x66])
+      case 0x0A:
+        escaped.append(contentsOf: [0x5C, 0x6E])
+      case 0x0D:
+        escaped.append(contentsOf: [0x5C, 0x72])
+      case 0x09:
+        escaped.append(contentsOf: [0x5C, 0x74])
+      case 0x00...0x1F:
+        escaped.append(contentsOf: [0x5C, 0x75, 0x30, 0x30])
+        escaped.append(hex[Int(byte >> 4)])
+        escaped.append(hex[Int(byte & 0x0F)])
+      default:
+        escaped.append(byte)
+      }
+    }
+    return String(decoding: escaped, as: UTF8.self)
+  }
+
+  private static func skipWhitespace(_ bytes: [UInt8], from start: Int) -> Int {
+    var position = start
+    while position < bytes.count {
+      switch bytes[position] {
+      case 0x20, 0x09, 0x0A, 0x0D:
+        position += 1
+      default:
+        return position
+      }
+    }
+    return position
+  }
+
+  private static func hexValue(_ byte: UInt8) -> UInt8? {
+    switch byte {
+    case 0x30...0x39: return byte - 0x30
+    case 0x41...0x46: return byte - 0x41 + 10
+    case 0x61...0x66: return byte - 0x61 + 10
+    default: return nil
+    }
+  }
+
+  private static func parseString(
+    _ bytes: [UInt8],
+    from start: Int
+  ) -> ParsedString? {
+    guard start < bytes.count, bytes[start] == Character("\"").asciiValue
+    else {
+      return nil
+    }
+
+    var value = [UInt8]()
+    var position = start + 1
+    while position < bytes.count {
+      let byte = bytes[position]
+      if byte == Character("\"").asciiValue {
+        return ParsedString(
+          end: position + 1,
+          value: String(decoding: value, as: UTF8.self)
+        )
+      }
+      if byte < 0x20 { return nil }
+      if byte != Character("\\").asciiValue {
+        value.append(byte)
+        position += 1
+        continue
+      }
+
+      position += 1
+      guard position < bytes.count else { return nil }
+      switch bytes[position] {
+      case 0x22, 0x5C, 0x2F:
+        value.append(bytes[position])
+      case 0x62:
+        value.append(0x08)
+      case 0x66:
+        value.append(0x0C)
+      case 0x6E:
+        value.append(0x0A)
+      case 0x72:
+        value.append(0x0D)
+      case 0x74:
+        value.append(0x09)
+      case 0x75:
+        guard position + 4 < bytes.count else { return nil }
+        var code: UInt16 = 0
+        for offset in 1...4 {
+          guard let nibble = hexValue(bytes[position + offset]) else {
+            return nil
+          }
+          code = (code << 4) | UInt16(nibble)
+        }
+        // Product field names are ASCII. Match the Windows parser's
+        // treatment of escaped non-ASCII keys while still validating syntax.
+        value.append(code <= 0x7F ? UInt8(code) : 0x3F)
+        position += 4
+      default:
+        return nil
+      }
+      position += 1
+    }
+    return nil
+  }
+
+  private static func skipValue(
+    _ bytes: [UInt8],
+    from start: Int
+  ) -> Int? {
+    guard start < bytes.count else { return nil }
+    if bytes[start] == Character("\"").asciiValue {
+      return parseString(bytes, from: start)?.end
+    }
+    if bytes[start] == Character("{").asciiValue ||
+        bytes[start] == Character("[").asciiValue {
+      var containers = [UInt8]()
+      var position = start
+      while position < bytes.count {
+        let byte = bytes[position]
+        if byte == Character("\"").asciiValue {
+          guard let stringEnd = parseString(bytes, from: position) else {
+            return nil
+          }
+          position = stringEnd.end
+          continue
+        }
+        if byte == Character("{").asciiValue ||
+            byte == Character("[").asciiValue {
+          containers.append(byte)
+          position += 1
+          continue
+        }
+        if byte == Character("}").asciiValue ||
+            byte == Character("]").asciiValue {
+          guard let opening = containers.last,
+                (byte == Character("}").asciiValue &&
+                  opening == Character("{").asciiValue) ||
+                (byte == Character("]").asciiValue &&
+                  opening == Character("[").asciiValue)
+          else {
+            return nil
+          }
+          containers.removeLast()
+          position += 1
+          if containers.isEmpty { return position }
+          continue
+        }
+        position += 1
+      }
+      return nil
+    }
+
+    var position = start
+    while position < bytes.count {
+      let byte = bytes[position]
+      if byte == 0x20 || byte == 0x09 || byte == 0x0A || byte == 0x0D ||
+          byte == Character(",").asciiValue ||
+          byte == Character("}").asciiValue ||
+          byte == Character("]").asciiValue {
+        break
+      }
+      position += 1
+    }
+    return position == start ? nil : position
   }
 }
 

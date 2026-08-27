@@ -187,9 +187,93 @@ class LibraryInventoryController extends ChangeNotifier {
       query.trim().isEmpty;
 
   void reorderLibrary(int oldIndex, int newIndex) {
-    if (!canReorderVisibleLibraries || oldIndex == newIndex) return;
+    if (!canReorderVisibleLibraries ||
+        oldIndex < 0 ||
+        oldIndex >= _customLibraryIds.length) {
+      return;
+    }
+
+    final selectedInOrder = _customLibraryIds
+        .where(_selectedLibraryIds.contains)
+        .toList(growable: false);
+    final draggedLibraryId = _customLibraryIds[oldIndex];
+    if (selectedInOrder.length > 1 &&
+        selectedInOrder.contains(draggedLibraryId)) {
+      _reorderSelectedLibraries(
+        oldIndex: oldIndex,
+        newIndex: newIndex,
+        selectedInOrder: selectedInOrder,
+      );
+      return;
+    }
+
+    if (oldIndex == newIndex ||
+        newIndex < 0 ||
+        newIndex > _customLibraryIds.length - 1) {
+      return;
+    }
     final libraryId = _customLibraryIds.removeAt(oldIndex);
     _customLibraryIds.insert(newIndex, libraryId);
+    notifyListeners();
+  }
+
+  /// Reorders an arbitrary group of libraries at an insertion point measured
+  /// in the list that remains after the group is removed.
+  void reorderLibrariesAt({
+    required List<String> libraryIds,
+    required int insertionIndex,
+  }) {
+    if (!canReorderVisibleLibraries || libraryIds.isEmpty) return;
+
+    final movingIds = libraryIds.toSet();
+    final moving = _customLibraryIds
+        .where(movingIds.contains)
+        .toList(growable: false);
+    if (moving.isEmpty) return;
+
+    final remaining = _customLibraryIds
+        .where((id) => !movingIds.contains(id))
+        .toList(growable: false);
+    final targetIndex = insertionIndex.clamp(0, remaining.length).toInt();
+    final reordered = <String>[
+      ...remaining.take(targetIndex),
+      ...moving,
+      ...remaining.skip(targetIndex),
+    ];
+    if (listEquals(reordered, _customLibraryIds)) return;
+    _customLibraryIds
+      ..clear()
+      ..addAll(reordered);
+    notifyListeners();
+  }
+
+  void _reorderSelectedLibraries({
+    required int oldIndex,
+    required int newIndex,
+    required List<String> selectedInOrder,
+  }) {
+    // ReorderableListView reports newIndex after removing only the dragged
+    // row. Convert that insertion point to the list that remains after all
+    // selected rows are removed, so dragging over another selected row does
+    // not split the block or change its relative order.
+    final afterDragged = List<String>.of(_customLibraryIds)..removeAt(oldIndex);
+    final insertionPoint = newIndex.clamp(0, afterDragged.length).toInt();
+    final targetIndex = afterDragged
+        .take(insertionPoint)
+        .where((id) => !selectedInOrder.contains(id))
+        .length;
+    final remaining = afterDragged
+        .where((id) => !selectedInOrder.contains(id))
+        .toList(growable: false);
+    final reordered = <String>[
+      ...remaining.take(targetIndex),
+      ...selectedInOrder,
+      ...remaining.skip(targetIndex),
+    ];
+    if (listEquals(reordered, _customLibraryIds)) return;
+    _customLibraryIds
+      ..clear()
+      ..addAll(reordered);
     notifyListeners();
   }
 

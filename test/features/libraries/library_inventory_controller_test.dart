@@ -67,6 +67,68 @@ void main() {
     expect(controller.hasUnsavedCustomOrder, isFalse);
   });
 
+  test(
+    'moves selected libraries together and keeps their relative order',
+    () async {
+      final platform = _OrderPlatform()
+        ..libraries = const [
+          KontaktLibrary(id: 'alpha', name: 'Alpha', userListIndex: 0),
+          KontaktLibrary(id: 'beta', name: 'Beta', userListIndex: 1),
+          KontaktLibrary(id: 'gamma', name: 'Gamma', userListIndex: 2),
+          KontaktLibrary(id: 'delta', name: 'Delta', userListIndex: 3),
+        ];
+      final controller = LibraryInventoryController(platform);
+      addTearDown(controller.dispose);
+
+      await controller.refresh();
+      controller.setLibrarySelected('beta', true);
+      controller.setLibrarySelected('gamma', true);
+
+      // The callback receives the destination after Flutter has removed the
+      // dragged row. Dragging Beta after Delta should move Beta and Gamma as a
+      // single block.
+      controller.reorderLibrary(1, 3);
+
+      expect(controller.visibleLibraries.map((library) => library.id), [
+        'alpha',
+        'delta',
+        'beta',
+        'gamma',
+      ]);
+      expect(controller.selectedLibraryIds, {'beta', 'gamma'});
+      expect(controller.hasUnsavedCustomOrder, isTrue);
+    },
+  );
+
+  test(
+    'dragging a selected row over its group does not split the group',
+    () async {
+      final platform = _OrderPlatform()
+        ..libraries = const [
+          KontaktLibrary(id: 'alpha', name: 'Alpha', userListIndex: 0),
+          KontaktLibrary(id: 'beta', name: 'Beta', userListIndex: 1),
+          KontaktLibrary(id: 'gamma', name: 'Gamma', userListIndex: 2),
+          KontaktLibrary(id: 'delta', name: 'Delta', userListIndex: 3),
+        ];
+      final controller = LibraryInventoryController(platform);
+      addTearDown(controller.dispose);
+
+      await controller.refresh();
+      controller.setLibrarySelected('beta', true);
+      controller.setLibrarySelected('gamma', true);
+
+      controller.reorderLibrary(1, 2);
+
+      expect(controller.visibleLibraries.map((library) => library.id), [
+        'alpha',
+        'beta',
+        'gamma',
+        'delta',
+      ]);
+      expect(controller.hasUnsavedCustomOrder, isFalse);
+    },
+  );
+
   test('refresh preserves the visible session order', () async {
     final platform = _OrderPlatform();
     final controller = LibraryInventoryController(platform);

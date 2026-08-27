@@ -78,9 +78,13 @@ let preservedPlistData = try PropertyListSerialization.data(
 try preservedPlistData.write(to: preservedPlistURL)
 
 let preservedJSONText = """
-{"ContentDir":"\(originalContent.path)","InstallSource":"Native Access","Nested":{"keep":true}}
+{
+  "InstallSource": "Native Access",
+  "Nested": {"keep":true},
+  "ContentDir": "\(originalContent.path)"
+}
 """
-let preservedJSONData = Data(preservedJSONText.utf8)
+let preservedJSONData = Data([0xEF, 0xBB, 0xBF]) + Data(preservedJSONText.utf8)
 try preservedJSONData.write(to: preservedJSONURL)
 
 let replacementXML = """
@@ -123,7 +127,18 @@ _ = try MutationTransaction.execute(
 )
 
 let relocatedJSONData = try Data(contentsOf: preservedJSONURL)
-let relocatedJSON = try JSONSerialization.jsonObject(with: relocatedJSONData)
+let expectedRelocatedJSONData = Data([0xEF, 0xBB, 0xBF]) + Data(
+  preservedJSONText
+    .replacingOccurrences(
+      of: "\"\(originalContent.path)\"",
+      with: "\"\(relocatedContent.path)\""
+    )
+    .utf8
+)
+precondition(relocatedJSONData == expectedRelocatedJSONData)
+let relocatedJSON = try JSONSerialization.jsonObject(
+  with: relocatedJSONData.dropFirst(3)
+)
   as! [String: Any]
 precondition(relocatedJSON["ContentDir"] as? String == relocatedContent.path)
 precondition(relocatedJSON["InstallSource"] as? String == "Native Access")
@@ -145,6 +160,87 @@ precondition(
 )
 let serviceDataAfterRelocate = try Data(contentsOf: preservedServiceURL)
 precondition(serviceDataAfterRelocate == preservedXMLData)
+
+// A record without ContentDir must receive the field immediately before the
+// closing brace while retaining its original formatting and trailing bytes.
+let insertedName = "Inserted Library"
+let insertedRegKey = "InsertedLibrary"
+let insertedJSONURL = locations.installedProducts.appendingPathComponent(
+  "\(insertedName).json"
+)
+let insertedJSONText = "{\"Vendor\":\"Native Instruments\"}\n"
+try Data(insertedJSONText.utf8).write(to: insertedJSONURL)
+let insertedRequest: [String: Any] = [
+  "version": 1,
+  "operation": "relocate",
+  "name": insertedName,
+  "regKey": insertedRegKey,
+  "snpid": "I01",
+  "contentPath": relocatedContent.path,
+]
+_ = try MutationTransaction.execute(
+  requestData: JSONSerialization.data(withJSONObject: insertedRequest),
+  locations: locations
+)
+let insertedJSONData = try Data(contentsOf: insertedJSONURL)
+let expectedInsertedJSON =
+  "{\"Vendor\":\"Native Instruments\",\"ContentDir\":\"\(relocatedContent.path)\"}\n"
+precondition(String(data: insertedJSONData, encoding: .utf8) == expectedInsertedJSON)
+
+// Kontakt has emitted lower-case contentDir keys in some installed_products
+// catalogs. Canonicalize that spelling so the resulting record uses the same
+// ContentDir key as Windows and Native Access.
+let lowercaseName = "Lowercase Library"
+let lowercaseRegKey = "LowercaseLibrary"
+let lowercaseJSONURL = locations.installedProducts.appendingPathComponent(
+  "\(lowercaseName).json"
+)
+let lowercaseJSONText = "{\"contentDir\":\"\(originalContent.path)\",\"Keep\":true}"
+try Data(lowercaseJSONText.utf8).write(to: lowercaseJSONURL)
+let lowercaseRequest: [String: Any] = [
+  "version": 1,
+  "operation": "relocate",
+  "name": lowercaseName,
+  "regKey": lowercaseRegKey,
+  "snpid": "L01",
+  "contentPath": relocatedContent.path,
+]
+_ = try MutationTransaction.execute(
+  requestData: JSONSerialization.data(withJSONObject: lowercaseRequest),
+  locations: locations
+)
+let lowercaseJSONData = try Data(contentsOf: lowercaseJSONURL)
+let expectedLowercaseJSON =
+  "{\"ContentDir\":\"\(relocatedContent.path)\",\"Keep\":true}"
+precondition(String(data: lowercaseJSONData, encoding: .utf8) == expectedLowercaseJSON)
+
+// An existing malformed record must be rejected and left untouched, matching
+// the Windows helper's non-destructive behavior.
+let invalidName = "Invalid Library"
+let invalidRegKey = "InvalidLibrary"
+let invalidJSONURL = locations.installedProducts.appendingPathComponent(
+  "\(invalidName).json"
+)
+let invalidJSONData = Data("not-json".utf8)
+try invalidJSONData.write(to: invalidJSONURL)
+let invalidRequest: [String: Any] = [
+  "version": 1,
+  "operation": "relocate",
+  "name": invalidName,
+  "regKey": invalidRegKey,
+  "snpid": "X01",
+  "contentPath": relocatedContent.path,
+]
+do {
+  _ = try MutationTransaction.execute(
+    requestData: JSONSerialization.data(withJSONObject: invalidRequest),
+    locations: locations
+  )
+  preconditionFailure("Malformed installed_products JSON was accepted")
+} catch {
+  let invalidJSONAfterFailure = try! Data(contentsOf: invalidJSONURL)
+  precondition(invalidJSONAfterFailure == invalidJSONData)
+}
 
 // The duplicate RegKey reproduces a damaged classic order. Batch removal must
 // delete the shared preference once without rejecting the whole transaction.

@@ -894,9 +894,15 @@ std::optional<std::string> UpdateContentDirectoryJson(
       break;
     }
     std::string key;
+    const size_t key_start = position;
     size_t key_end = 0;
     if (!ParseJsonString(text, position, &key_end, &key)) {
       return std::nullopt;
+    }
+    if (key == "contentDir") {
+      const std::string canonical_key = "\"ContentDir\"";
+      text.replace(key_start, key_end - key_start, canonical_key);
+      key_end = key_start + canonical_key.size();
     }
     position = SkipJsonWhitespace(text, key_end);
     if (position >= text.size() || text[position] != ':') {

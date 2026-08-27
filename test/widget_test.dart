@@ -402,6 +402,190 @@ void main() {
     expect(find.text('Save'), findsNothing);
   });
 
+  testWidgets('dragging a selected group shows every selected row', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final platform = _FakePlatform(
+      libraries: const [
+        KontaktLibrary(id: 'alpha', name: 'Alpha', userListIndex: 0),
+        KontaktLibrary(id: 'beta', name: 'Beta', userListIndex: 1),
+        KontaktLibrary(id: 'gamma', name: 'Gamma', userListIndex: 2),
+      ],
+    );
+
+    await tester.pumpWidget(KontaktLibraryManagerApp(platform: platform));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('select-library-alpha')));
+    await tester.tap(find.byKey(const ValueKey('select-library-beta')));
+    await tester.tap(find.byKey(const ValueKey('select-library-gamma')));
+    await tester.pumpAndSettle();
+    final sourceCard = find.byKey(const ValueKey('library-card-alpha'));
+    final sourceLeft = tester.getTopLeft(sourceCard).dx;
+    final sourceTop = tester.getTopLeft(sourceCard).dy;
+    final sourceWidth = tester.getSize(sourceCard).width;
+    final handleCenter = tester.getCenter(
+      find.byIcon(Icons.drag_indicator_rounded).first,
+    );
+
+    final gesture = await tester.startGesture(handleCenter);
+    await gesture.moveBy(const Offset(0, 24));
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('selected-drag-preview-beta')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('selected-drag-preview-gamma')),
+      findsOneWidget,
+    );
+    // The non-dragged selected rows collapse instead of leaving a visible or
+    // transparent copy in their original slots.
+    expect(find.byKey(const ValueKey('library-card-beta')), findsNothing);
+    expect(
+      tester
+          .getCenter(
+            find.descendant(
+              of: find.byKey(const ValueKey('selected-drag-preview-beta')),
+              matching: find.byIcon(Icons.drag_indicator_rounded),
+            ),
+          )
+          .dx,
+      closeTo(handleCenter.dx, 1),
+    );
+    expect(tester.getTopLeft(sourceCard).dx, closeTo(sourceLeft, 1));
+    expect(tester.getTopLeft(sourceCard).dy, closeTo(sourceTop + 24, 1));
+    expect(tester.getSize(sourceCard).width, closeTo(sourceWidth, 1));
+    await gesture.up();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('selected-drag-preview-beta')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('selecting multiple libraries preserves list spacing', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final platform = _FakePlatform(
+      libraries: const [
+        KontaktLibrary(id: 'alpha', name: 'Alpha', userListIndex: 0),
+        KontaktLibrary(id: 'beta', name: 'Beta', userListIndex: 1),
+        KontaktLibrary(id: 'gamma', name: 'Gamma', userListIndex: 2),
+      ],
+    );
+
+    await tester.pumpWidget(KontaktLibraryManagerApp(platform: platform));
+    await tester.pumpAndSettle();
+    final alphaCard = find.byKey(const ValueKey('library-card-alpha'));
+    final betaCard = find.byKey(const ValueKey('library-card-beta'));
+    final initialAlphaTop = tester.getTopLeft(alphaCard).dy;
+    final initialRowSpacing = tester.getTopLeft(betaCard).dy - initialAlphaTop;
+    final initialHandleCenter = tester.getCenter(
+      find.descendant(
+        of: alphaCard,
+        matching: find.byIcon(Icons.drag_indicator_rounded),
+      ),
+    );
+
+    await tester.tap(find.byKey(const ValueKey('select-library-alpha')));
+    await tester.tap(find.byKey(const ValueKey('select-library-beta')));
+    await tester.pumpAndSettle();
+
+    expect(tester.getTopLeft(alphaCard).dy, closeTo(initialAlphaTop, 0.01));
+    expect(
+      tester.getTopLeft(betaCard).dy - tester.getTopLeft(alphaCard).dy,
+      closeTo(initialRowSpacing, 0.01),
+    );
+    expect(
+      tester.getCenter(
+        find.descendant(
+          of: alphaCard,
+          matching: find.byIcon(Icons.drag_indicator_rounded),
+        ),
+      ),
+      initialHandleCenter,
+    );
+  });
+
+  testWidgets('dragging a selected group preserves the pointer anchor', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1100, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final platform = _FakePlatform(
+      libraries: const [
+        KontaktLibrary(id: 'alpha', name: 'Alpha', userListIndex: 0),
+        KontaktLibrary(id: 'beta', name: 'Beta', userListIndex: 1),
+        KontaktLibrary(id: 'gamma', name: 'Gamma', userListIndex: 2),
+      ],
+    );
+
+    await tester.pumpWidget(KontaktLibraryManagerApp(platform: platform));
+    await tester.pumpAndSettle();
+    final firstCard = find.byKey(const ValueKey('library-card-alpha'));
+
+    await tester.tap(find.byKey(const ValueKey('select-library-alpha')));
+    await tester.tap(find.byKey(const ValueKey('select-library-beta')));
+    await tester.pumpAndSettle();
+    final selectedFirstTop = tester.getTopLeft(firstCard).dy;
+
+    final betaHandle = find.descendant(
+      of: find.byKey(const ValueKey('library-card-beta')),
+      matching: find.byIcon(Icons.drag_indicator_rounded),
+    );
+    final betaCard = find.byKey(const ValueKey('library-card-beta'));
+    final initialBetaTopLeft = tester.getTopLeft(betaCard);
+    final initialRowSpacing = initialBetaTopLeft.dy - selectedFirstTop;
+    final gesture = await tester.startGesture(tester.getCenter(betaHandle));
+    await tester.pump();
+
+    // A multi-selection uses the same reorderable proxy as one row. Merely
+    // pressing the handle must not move the grabbed card in either axis.
+    expect(tester.getTopLeft(betaCard).dx, closeTo(initialBetaTopLeft.dx, 1));
+    expect(tester.getTopLeft(betaCard).dy, closeTo(initialBetaTopLeft.dy, 1));
+    expect(find.byKey(const ValueKey('library-card-alpha')), findsOneWidget);
+
+    // Small pointer jitter while pressing the handle is still a click, not a
+    // drag, so the selected origin remains in place.
+    await gesture.moveBy(const Offset(2, 0));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('library-card-alpha')), findsOneWidget);
+
+    await gesture.moveBy(const Offset(0, 24));
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('library-card-alpha')), findsNothing);
+    expect(tester.getTopLeft(betaCard).dx, closeTo(initialBetaTopLeft.dx, 1));
+    expect(
+      tester.getTopLeft(betaCard).dy,
+      closeTo(initialBetaTopLeft.dy + 24, 1),
+    );
+    expect(
+      tester
+              .getTopLeft(
+                find.byKey(const ValueKey('selected-drag-preview-alpha')),
+              )
+              .dy -
+          tester.getTopLeft(betaCard).dy,
+      closeTo(-initialRowSpacing, 1),
+    );
+    await gesture.up();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('library rows keep the same height when filtering', (
     tester,
   ) async {

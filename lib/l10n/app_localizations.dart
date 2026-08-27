@@ -173,6 +173,7 @@ class AppLocalizations {
       'sort': 'Sort',
       'customOrder': 'Custom order',
       'dragToReorder': 'Drag to move this library',
+      'dragToReorderSelected': 'Drag to move selected libraries together',
       'saveChanges': 'Save changes',
       'classicOrderSaved': 'The classic Kontakt order was saved.',
       'classicOrderSaveFailed': 'The order could not be saved',
@@ -412,6 +413,8 @@ class AppLocalizations {
       'sort': 'Ordenar',
       'customOrder': 'Orden personalizado',
       'dragToReorder': 'Arrastra para mover esta librería',
+      'dragToReorderSelected':
+          'Arrastra para mover juntas las librerías seleccionadas',
       'saveChanges': 'Guardar cambios',
       'classicOrderSaved': 'Se guardó el orden clásico de Kontakt.',
       'classicOrderSaveFailed': 'No se pudo guardar el orden',
@@ -656,6 +659,8 @@ class AppLocalizations {
       'sort': 'Ordenar',
       'customOrder': 'Ordem personalizada',
       'dragToReorder': 'Arraste para mover esta biblioteca',
+      'dragToReorderSelected':
+          'Arraste para mover juntas as bibliotecas selecionadas',
       'saveChanges': 'Salvar alterações',
       'classicOrderSaved': 'A ordem clássica do Kontakt foi salva.',
       'classicOrderSaveFailed': 'Não foi possível salvar a ordem',
@@ -857,6 +862,7 @@ class AppLocalizations {
       'sort': '排序',
       'customOrder': '自定义顺序',
       'dragToReorder': '拖动以移动此音色库',
+      'dragToReorderSelected': '拖动以一起移动选中的音色库',
       'saveChanges': '保存更改',
       'classicOrderSaved': '经典 Kontakt 顺序已保存。',
       'classicOrderSaveFailed': '无法保存顺序',

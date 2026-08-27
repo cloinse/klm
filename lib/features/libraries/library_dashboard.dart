@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_selector_platform_interface/file_selector_platform_interface.dart';
@@ -1054,7 +1055,7 @@ class _LibraryActionController {
   }
 }
 
-class _InventoryView extends StatelessWidget {
+class _InventoryView extends StatefulWidget {
   const _InventoryView({
     required this.controller,
     required this.actions,
@@ -1064,6 +1065,87 @@ class _InventoryView extends StatelessWidget {
   final LibraryInventoryController controller;
   final _LibraryActionController actions;
   final VoidCallback onShowDiagnostics;
+
+  @override
+  State<_InventoryView> createState() => _InventoryViewState();
+}
+
+class _InventoryViewState extends State<_InventoryView> {
+  String? _draggedLibraryId;
+  List<String> _draggedSelectedLibraryIds = const <String>[];
+  int _dragSession = 0;
+  final Map<String, GlobalKey> _libraryRowKeys = <String, GlobalKey>{};
+  double? _draggedRowExtent;
+  int? _dragPointer;
+  Offset? _dragPointerDownPosition;
+  bool _dragHasMoved = false;
+
+  LibraryInventoryController get controller => widget.controller;
+  _LibraryActionController get actions => widget.actions;
+  VoidCallback get onShowDiagnostics => widget.onShowDiagnostics;
+
+  void _trackDragPointerDown(PointerDownEvent event) {
+    _dragPointer = event.pointer;
+    _dragPointerDownPosition = event.position;
+    _dragHasMoved = false;
+  }
+
+  void _trackDragPointerMove(PointerMoveEvent event) {
+    if (_dragPointer != event.pointer || _dragHasMoved) return;
+    final downPosition = _dragPointerDownPosition;
+    if (downPosition == null ||
+        (event.position - downPosition).distance < kTouchSlop) {
+      return;
+    }
+    _dragHasMoved = true;
+    if (_draggedSelectedLibraryIds.length > 1 && mounted) {
+      setState(() {});
+    }
+  }
+
+  void _trackDragPointerEnd(int pointer) {
+    if (_dragPointer != pointer) return;
+    _dragPointer = null;
+    _dragPointerDownPosition = null;
+  }
+
+  void _startLibraryDrag(List<KontaktLibrary> libraries, int index) {
+    if (index < 0 || index >= libraries.length) return;
+    final draggedLibrary = libraries[index];
+    final selectedLibraries =
+        controller.selectedLibraryCount > 1 &&
+            controller.isLibrarySelected(draggedLibrary.id)
+        ? libraries
+              .where((library) => controller.isLibrarySelected(library.id))
+              .toList(growable: false)
+        : <KontaktLibrary>[draggedLibrary];
+    final rowRenderObject = _libraryRowKeys[draggedLibrary.id]?.currentContext
+        ?.findRenderObject();
+    final rowExtent = rowRenderObject is RenderBox && rowRenderObject.hasSize
+        ? rowRenderObject.size.height
+        : null;
+    _dragSession++;
+    setState(() {
+      _draggedLibraryId = draggedLibrary.id;
+      _draggedRowExtent = rowExtent;
+      _draggedSelectedLibraryIds = [
+        for (final library in selectedLibraries) library.id,
+      ];
+    });
+  }
+
+  void _finishLibraryDrag() {
+    final session = ++_dragSession;
+    Future<void>.delayed(const Duration(milliseconds: 280), () {
+      if (!mounted || session != _dragSession) return;
+      setState(() {
+        _draggedLibraryId = null;
+        _draggedRowExtent = null;
+        _draggedSelectedLibraryIds = const <String>[];
+        _dragHasMoved = false;
+      });
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1255,6 +1337,9 @@ class _InventoryView extends StatelessWidget {
     }
 
     if (controller.canReorderVisibleLibraries) {
+      final selectedLibraries = libraries
+          .where((library) => controller.isLibrarySelected(library.id))
+          .toList(growable: false);
       return ReorderableListView.builder(
         padding: const EdgeInsets.only(bottom: 16),
         buildDefaultDragHandles: false,
@@ -1268,38 +1353,81 @@ class _InventoryView extends StatelessWidget {
               : newIndex;
           controller.reorderLibrary(oldIndex, adjustedNewIndex);
         },
-        proxyDecorator: (child, _, animation) => AnimatedBuilder(
-          animation: animation,
-          builder: (context, child) => Material(
-            color: Colors.transparent,
-            elevation: 10 * animation.value,
-            borderRadius: BorderRadius.circular(12),
-            child: child,
-          ),
-          child: child,
-        ),
-        itemBuilder: (context, index) => Padding(
-          key: ValueKey('custom-order-${libraries[index].id}'),
-          padding: const EdgeInsets.only(bottom: 8),
-          child: _libraryCard(
+        onReorderStart: (index) => _startLibraryDrag(libraries, index),
+        onReorderEnd: (_) => _finishLibraryDrag(),
+        proxyDecorator: (child, index, animation) {
+          final draggedLibrary = index >= 0 && index < libraries.length
+              ? libraries[index]
+              : null;
+          final draggingSelectedGroup =
+              draggedLibrary != null &&
+              _draggedLibraryId == draggedLibrary.id &&
+              _draggedSelectedLibraryIds.length > 1;
+
+          final proxyChild = draggingSelectedGroup
+              ? _SelectedLibrariesDragPreview(
+                  draggedChild: child,
+                  draggedLibraryId: draggedLibrary.id,
+                  libraries: selectedLibraries,
+                  rowExtent:
+                      _draggedRowExtent ??
+                      (MediaQuery.sizeOf(context).width < 1120 ? 103 : 78),
+                )
+              : child;
+          return _ReorderDragProxy(animation: animation, child: proxyChild);
+        },
+        itemBuilder: (context, index) {
+          final library = libraries[index];
+          final hideSelectedOriginPlaceholder =
+              _dragHasMoved &&
+              _draggedSelectedLibraryIds.length > 1 &&
+              library.id != _draggedLibraryId &&
+              _draggedSelectedLibraryIds.contains(library.id);
+          final card = _libraryCard(
             context,
-            libraries[index],
-            dragHandle: ReorderableDragStartListener(
-              index: index,
-              child: Tooltip(
-                message: context.l10n.tr('dragToReorder'),
-                child: MouseRegion(
-                  cursor: SystemMouseCursors.grab,
-                  child: const SizedBox(
-                    width: 36,
-                    height: 44,
-                    child: Center(child: Icon(Icons.drag_indicator_rounded)),
+            library,
+            dragHandle: Listener(
+              behavior: HitTestBehavior.opaque,
+              onPointerDown: _trackDragPointerDown,
+              onPointerMove: _trackDragPointerMove,
+              onPointerUp: (event) => _trackDragPointerEnd(event.pointer),
+              onPointerCancel: (event) => _trackDragPointerEnd(event.pointer),
+              child: ReorderableDragStartListener(
+                index: index,
+                child: Tooltip(
+                  message:
+                      controller.selectedLibraryCount > 1 &&
+                          controller.isLibrarySelected(library.id)
+                      ? context.l10n.tr('dragToReorderSelected')
+                      : context.l10n.tr('dragToReorder'),
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.grab,
+                    child: const SizedBox(
+                      width: 36,
+                      height: 44,
+                      child: Center(child: Icon(Icons.drag_indicator_rounded)),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ),
+          );
+          return Padding(
+            key: _libraryRowKeys.putIfAbsent(
+              library.id,
+              () => GlobalKey(debugLabel: 'custom-order-${library.id}'),
+            ),
+            padding: hideSelectedOriginPlaceholder
+                ? EdgeInsets.zero
+                : const EdgeInsets.only(bottom: 8),
+            // The reorderable list already provides the active row's gap. The
+            // other selected rows must collapse completely so the remaining
+            // libraries move up while the group follows the pointer.
+            child: hideSelectedOriginPlaceholder
+                ? const SizedBox.shrink()
+                : card,
+          );
+        },
       );
     }
 
@@ -1329,6 +1457,138 @@ class _InventoryView extends StatelessWidget {
       onRepair: () => actions.repairLibrary(context, library),
       onRelocate: () => actions.relocateLibrary(context, library),
       onRemove: () => actions.removeLibrary(context, library),
+    );
+  }
+}
+
+/// Adds the same animated elevation used by Flutter's default reorder proxy.
+/// Keeping it separate lets a multi-selection use a taller proxy without
+/// changing the list's one-row layout or the reorder calculations.
+class _ReorderDragProxy extends StatelessWidget {
+  const _ReorderDragProxy({required this.animation, required this.child});
+
+  final Animation<double> animation;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, child) {
+        final value = Curves.easeOutCubic.transform(animation.value);
+        return Material(
+          color: Colors.transparent,
+          elevation: 10 * value,
+          shadowColor: Colors.black54,
+          borderRadius: BorderRadius.circular(12),
+          child: child,
+        );
+      },
+      child: child,
+    );
+  }
+}
+
+/// Displays every selected library in the floating drag proxy. The selected
+/// rows keep their current order and the preview is offset so the row grabbed
+/// by the pointer stays anchored while the entire block follows it.
+class _SelectedLibrariesDragPreview extends StatelessWidget {
+  const _SelectedLibrariesDragPreview({
+    required this.draggedChild,
+    required this.draggedLibraryId,
+    required this.libraries,
+    required this.rowExtent,
+  });
+
+  final Widget draggedChild;
+  final String draggedLibraryId;
+  final List<KontaktLibrary> libraries;
+  final double rowExtent;
+
+  @override
+  Widget build(BuildContext context) {
+    final draggedIndex = libraries.indexWhere(
+      (library) => library.id == draggedLibraryId,
+    );
+    // The preview rows use the same extents as the regular library cards, so
+    // the row grabbed by the pointer stays anchored while preceding selected
+    // rows are rendered above it.
+    final anchoredIndex = draggedIndex.clamp(0, libraries.length).toInt();
+    final colors = context.klmColors;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        // Leave Flutter's actual reorderable child untouched at the proxy
+        // origin. This preserves the exact pointer anchor of a one-row drag;
+        // the other selected rows are only painted around it.
+        draggedChild,
+        for (var index = 0; index < libraries.length; index++)
+          if (index != anchoredIndex)
+            Transform.translate(
+              offset: Offset(0, rowExtent * (index - anchoredIndex)),
+              child: _SelectedLibraryDragRow(library: libraries[index]),
+            ),
+        Positioned(
+          top: 5,
+          right: 8,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: colors.accentButtonBackground,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: colors.accentButtonBorder),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.layers_rounded, size: 13),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${libraries.length}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SelectedLibraryDragRow extends StatelessWidget {
+  const _SelectedLibraryDragRow({required this.library});
+
+  final KontaktLibrary library;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      key: ValueKey('selected-drag-preview-${library.id}'),
+      padding: const EdgeInsets.only(bottom: 8),
+      child: IgnorePointer(
+        child: _LibraryCard(
+          library: library,
+          selected: true,
+          onSelectionChanged: (_) {},
+          dragHandle: const SizedBox(
+            width: 36,
+            height: 44,
+            child: Center(child: Icon(Icons.drag_indicator_rounded)),
+          ),
+          onReveal: () {},
+          onDiagnose: () {},
+          onRepair: () {},
+          onRelocate: () {},
+          onRemove: () {},
+        ),
+      ),
     );
   }
 }

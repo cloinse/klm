@@ -387,6 +387,11 @@ void main() {
         nativeMutation,
         contains('key == "ContentDir" || key == "contentDir"'),
       );
+      expect(nativeMutation, contains('key == "contentDir"'));
+      expect(
+        nativeMutation,
+        contains('canonical_key = "\\"ContentDir\\""'),
+      );
       expect(platform, contains('preferValues: true'));
       expect(nativeMutation, contains('ContentDirectoryJson('));
       expect(nativeMutation, contains('KEY_WOW64_64KEY'));
