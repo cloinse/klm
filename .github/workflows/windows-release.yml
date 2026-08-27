@@ -4,6 +4,17 @@ on:
   push:
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Git ref containing the release source
+        required: true
+        default: main
+        type: string
+      release_tag:
+        description: Release tag to publish (for example, v0.3.1)
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -19,10 +30,11 @@ jobs:
     timeout-minutes: 45
 
     steps:
-      - name: Check out tagged source
+      - name: Check out release source
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref }}
 
       - name: Set up Flutter 3.38.9
         uses: subosito/flutter-action@v2
@@ -126,7 +138,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          KLM_RELEASE_TAG: ${{ github.ref_name }}
+          KLM_RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
         run: |
           $ErrorActionPreference = 'Stop'
           $tag = $env:KLM_RELEASE_TAG
