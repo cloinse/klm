@@ -123,6 +123,10 @@ class AppLocalizations {
       'confirmRemoveMultipleTitle': 'Remove {count} library records?',
       'confirmAddMessage':
           'The following libraries will be registered for Kontakt:',
+      'skippedFoldersSummary':
+          '{count} folders without Kontakt library metadata were skipped.',
+      'candidateAmbiguous':
+          'The selected folder contains more than one matching library.',
       'confirmRepairMessage':
           'The XML, preference, and installed_products records will be rebuilt.',
       'confirmRelocateMessage':
@@ -364,6 +368,10 @@ class AppLocalizations {
           '¿Eliminar {count} registros de la librería?',
       'confirmAddMessage':
           'Las siguientes librerías se registrarán para Kontakt:',
+      'skippedFoldersSummary':
+          'Se omitieron {count} carpetas sin metadata de librería Kontakt.',
+      'candidateAmbiguous':
+          'La carpeta seleccionada contiene más de una librería coincidente.',
       'confirmRepairMessage':
           'Se reconstruirán los registros XML, de preferencias e installed_products.',
       'confirmRelocateMessage':
@@ -611,6 +619,10 @@ class AppLocalizations {
       'confirmRemoveMultipleTitle': 'Remover {count} registros da biblioteca?',
       'confirmAddMessage':
           'As seguintes bibliotecas serão registradas para o Kontakt:',
+      'skippedFoldersSummary':
+          '{count} pastas sem metadata de biblioteca Kontakt foram ignoradas.',
+      'candidateAmbiguous':
+          'A pasta selecionada contém mais de uma biblioteca correspondente.',
       'confirmRepairMessage':
           'Os registros XML, de preferências e installed_products serão reconstruídos.',
       'confirmRelocateMessage':
@@ -821,6 +833,8 @@ class AppLocalizations {
       'confirmRemoveTitle': '删除音色库记录？',
       'confirmRemoveMultipleTitle': '删除 {count} 条音色库记录？',
       'confirmAddMessage': '以下音色库将注册到 Kontakt：',
+      'skippedFoldersSummary': '已跳过 {count} 个没有 Kontakt 音色库元数据的文件夹。',
+      'candidateAmbiguous': '所选文件夹包含多个匹配的音色库。',
       'confirmRepairMessage': '将重建 XML、偏好设置和 installed_products 记录。',
       'confirmRelocateMessage': '注册的内容路径将更改为：',
       'confirmRemoveMessage':

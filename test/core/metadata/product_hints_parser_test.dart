@@ -42,6 +42,10 @@ otros datos
 
     expect(document.metadata.snpid, 'a1b');
     expect(document.xml, contains('<SNPID>a1b</SNPID>'));
+    expect(
+      document.xml.trim(),
+      '<ProductHints><Product><Name>A</Name><RegKey>A</RegKey><SNPID>a1b</SNPID></Product></ProductHints>',
+    );
   });
 
   test('preserva la declaración XML de ProductHints', () {

@@ -1103,9 +1103,9 @@ class _FakePlatform implements KontaktPlatform {
   }
 
   @override
-  Future<List<KontaktLibraryCandidate>> chooseLibraryCandidates({
+  Future<LibraryCandidateScanResult> chooseLibraryCandidates({
     required bool allowMultiple,
-  }) async => candidates;
+  }) async => LibraryCandidateScanResult(candidates: candidates);
 
   @override
   Future<String?> chooseContentDirectory() async => null;

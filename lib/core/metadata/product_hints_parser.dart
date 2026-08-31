@@ -94,10 +94,12 @@ class ProductHintsParser {
       icon: _nullable(_value(product, 'Icon')),
       applications: Set<String>.unmodifiable(applications),
     );
-    final serializedXml = document.toXmlString(pretty: true, indent: '  ');
+    // Keep the original ProductHints bytes intact. Reformatting can drop
+    // attributes, ordering, or whitespace that Kontakt uses when resolving
+    // library files from Service Center XML.
     return ProductHintsDocument(
       metadata: metadata,
-      xml: declaration == null ? serializedXml : '$declaration\n$serializedXml',
+      xml: declaration == null ? fragment : '$declaration\n$fragment',
     );
   }
 

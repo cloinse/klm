@@ -58,7 +58,7 @@ abstract class KontaktPlatform {
 
   Future<PrivilegedHelperStatus> enablePrivilegedHelper();
 
-  Future<List<KontaktLibraryCandidate>> chooseLibraryCandidates({
+  Future<LibraryCandidateScanResult> chooseLibraryCandidates({
     required bool allowMultiple,
   });
 

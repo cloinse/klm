@@ -39,6 +39,36 @@ class KontaktLibraryCandidate {
   };
 }
 
+enum LibraryCandidateSkipReason {
+  missingMetadata,
+  notKontakt,
+  invalidMetadata,
+  missingFolder,
+  searchLimit,
+  filesystemRoot,
+}
+
+class LibraryCandidateSkip {
+  const LibraryCandidateSkip({required this.path, required this.reason});
+
+  final String path;
+  final LibraryCandidateSkipReason reason;
+}
+
+class LibraryCandidateScanResult {
+  const LibraryCandidateScanResult({
+    required this.candidates,
+    this.skipped = const [],
+  });
+
+  static const empty = LibraryCandidateScanResult(candidates: []);
+
+  final List<KontaktLibraryCandidate> candidates;
+  final List<LibraryCandidateSkip> skipped;
+
+  bool get isEmpty => candidates.isEmpty;
+}
+
 class KontaktMutationRequest {
   const KontaktMutationRequest._(this.payload);
 

@@ -394,7 +394,7 @@ class LibraryInventoryController extends ChangeNotifier {
     if (notify) notifyListeners();
   }
 
-  Future<List<KontaktLibraryCandidate>> chooseLibraryCandidates({
+  Future<LibraryCandidateScanResult> chooseLibraryCandidates({
     required bool allowMultiple,
   }) {
     return platform.chooseLibraryCandidates(allowMultiple: allowMultiple);

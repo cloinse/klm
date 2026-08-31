@@ -426,7 +426,7 @@ class MacOSKontaktPlatform implements KontaktPlatform {
   }
 
   @override
-  Future<List<KontaktLibraryCandidate>> chooseLibraryCandidates({
+  Future<LibraryCandidateScanResult> chooseLibraryCandidates({
     required bool allowMultiple,
   }) async {
     final paths =
