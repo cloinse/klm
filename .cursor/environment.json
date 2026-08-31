@@ -1,0 +1,5 @@
+{
+  "name": "Kontakt Library Manager",
+  "user": "ubuntu",
+  "install": "bash ./.cursor/install.sh"
+}
