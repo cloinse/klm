@@ -3,20 +3,21 @@
   <channel>
     <title>Kontakt Library Manager - Windows</title>
     <item>
-      <title>0.3.1</title>
-      <pubDate>Thu, 27 Aug 2026 03:52:39 GMT</pubDate>
-      <sparkle:version>23</sparkle:version>
-      <sparkle:shortVersionString>0.3.1</sparkle:shortVersionString>
+      <title>0.3.2</title>
+      <pubDate>Mon, 31 Aug 2026 16:34:53 GMT</pubDate>
+      <sparkle:version>24</sparkle:version>
+      <sparkle:shortVersionString>0.3.2</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>10.0</sparkle:minimumSystemVersion>
-      <description sparkle:format="plain-text"><![CDATA[- Fixed multi-library dragging.
-- Improved library path updates on macOS and Windows.]]></description>
+      <description sparkle:format="plain-text"><![CDATA[- Improved library detection when adding or repairing (now searches subfolders).
+- Shows which folders were skipped for not containing a Kontakt library.
+- Warns when a folder contains more than one matching library.]]></description>
       <enclosure
-        url="https://github.com/cloinse/klm/releases/download/v0.3.1/klm-windows-v0.3.1.exe"
-        length="14152790"
+        url="https://github.com/cloinse/klm/releases/download/v0.3.2/klm-windows-v0.3.2.exe"
+        length="14153665"
         type="application/octet-stream"
         sparkle:os="windows-x64"
         sparkle:installerArguments="/SILENT /SP- /NOICONS /NORESTART"
-        sparkle:edSignature="pPl7D2kUeM+VbtXw4ID0VFZZpPKeuJ3XyYJxVLF0Y/b6fpuKc5SuUEyTWahfuYy5Q29nVq3ki97zd9vhxqKSAw=="
+        sparkle:edSignature="q4zom1V5MN8dtW/Q1EM/SxCOTF9EH3r92zEBAmXFt/aW9VXCkrNnj53FFopAJeCccTsc/icclJi0FjghLWRFAQ=="
       />
     </item>
   </channel>
