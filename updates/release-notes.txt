@@ -1,2 +1,3 @@
-- Fixed multi-library dragging.
-- Improved library path updates on macOS and Windows.
+- Improved library detection when adding or repairing (now searches subfolders).
+- Shows which folders were skipped for not containing a Kontakt library.
+- Warns when a folder contains more than one matching library.
