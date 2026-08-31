@@ -4,19 +4,20 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     <channel>
         <title>Kontakt Library Manager</title>
         <item>
-            <title>0.3.1</title>
-            <pubDate>Thu, 27 Aug 2026 03:41:38 +0000</pubDate>
-            <sparkle:version>23</sparkle:version>
-            <sparkle:shortVersionString>0.3.1</sparkle:shortVersionString>
+            <title>0.3.2</title>
+            <pubDate>Mon, 31 Aug 2026 16:35:02 +0000</pubDate>
+            <sparkle:version>24</sparkle:version>
+            <sparkle:shortVersionString>0.3.2</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>10.15</sparkle:minimumSystemVersion>
                   <description sparkle:format="plain-text"><![CDATA[
-- Fixed multi-library dragging.
-- Improved library path updates on macOS and Windows.
+- Improved library detection when adding or repairing (now searches subfolders).
+- Shows which folders were skipped for not containing a Kontakt library.
+- Warns when a folder contains more than one matching library.
 ]]></description>
-<enclosure url="https://github.com/cloinse/klm/releases/download/v0.3.1/klm-macos-v0.3.1.dmg" length="21831408" type="application/octet-stream" sparkle:edSignature="6VEBpW12gkzi1N0v7SkQCvGLPnb+cfCEosoVlI1kggSVyg5oh1tNZQ1RcDMQIBrBwDgv0Ugqxh1VXb2wN/waDg=="></enclosure>
+<enclosure url="https://github.com/cloinse/klm/releases/download/v0.3.2/klm-macos-v0.3.2.dmg" length="21835843" type="application/octet-stream" sparkle:edSignature="vvwW/vtkM6m9C6dDwfop9/CAM6ClZqt5i8uQ2CkGy3AKLfuo/tiZVWmm/PfMMr4UFrgMOJqs0T888YXF1kMfDw=="></enclosure>
         </item>
     </channel>
 </rss><!-- sparkle-signatures:
-edSignature: kpK+wpsYXoVqIAnd8OU/+7OwyUG+/PZ5Akgq9C6j5cve9Xl0hEkGpZKwc8LYFldVlvbk0ZwkNcWpKnMcbruYBg==
-length: 1216
+edSignature: iQICg4bdvWpOcHyHGXsw2nXJ33jwsh6JGB9RhXGp8lbs2wuDfyi+QNB/ieYpGBLoPY6F/LgPyUu0yFB2KffvAg==
+length: 1347
 -->
