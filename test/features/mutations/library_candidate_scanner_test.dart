@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kontakt_library_manager/core/models/kontakt_mutation.dart';
 import 'package:kontakt_library_manager/features/mutations/library_candidate_scanner.dart';
 
 void main() {
@@ -103,6 +104,95 @@ void main() {
       () => scanner.scanDirectories([first.path, second.path]),
       throwsA(isA<LibraryCandidateException>()),
     );
+  });
+
+  test(
+    'skips folders without metadata and installs the rest of a batch',
+    () async {
+      final library = await Directory.systemTemp.createTemp('klm-batch-ok-');
+      final empty = await Directory.systemTemp.createTemp('klm-batch-empty-');
+      addTearDown(() => library.delete(recursive: true));
+      addTearDown(() => empty.delete(recursive: true));
+      await File('${library.path}/Piano.nicnt').writeAsString(
+        _productHints(name: 'Piano', regKey: 'Piano', snpid: 'p01'),
+      );
+
+      final result = await scanner.scanDirectories([library.path, empty.path]);
+
+      expect(result.candidates, hasLength(1));
+      expect(result.candidates.single.metadata.name, 'Piano');
+      expect(result.skipped, hasLength(1));
+      expect(result.skipped.single.path, empty.path);
+      expect(
+        result.skipped.single.reason,
+        LibraryCandidateSkipReason.missingMetadata,
+      );
+    },
+  );
+
+  test('discovers nested libraries under a parent folder', () async {
+    final root = await Directory.systemTemp.createTemp('klm-nested-');
+    addTearDown(() => root.delete(recursive: true));
+    final first = await Directory('${root.path}/First').create();
+    final second = await Directory(
+      '${root.path}/Vendor/Second',
+    ).create(recursive: true);
+    await Directory('${root.path}/Samples').create();
+    await File('${first.path}/First.nicnt').writeAsString(
+      _productHints(name: 'First', regKey: 'First', snpid: 'n01'),
+    );
+    await File('${second.path}/Second.nicnt').writeAsString(
+      _productHints(name: 'Second', regKey: 'Second', snpid: 'n02'),
+    );
+
+    final result = await scanner.scanDirectories([root.path]);
+
+    expect(
+      result.candidates.map((candidate) => candidate.metadata.name).toSet(),
+      {'First', 'Second'},
+    );
+    expect(result.skipped, isEmpty);
+  });
+
+  test('points ContentDir at the library root when NICNT is nested', () async {
+    final library = await Directory.systemTemp.createTemp('klm-content-root-');
+    addTearDown(() => library.delete(recursive: true));
+    await Directory('${library.path}/Instruments').create();
+    final docs = await Directory('${library.path}/Documentation').create();
+    await File('${docs.path}/Nested.nicnt').writeAsString(
+      _productHints(name: 'Nested', regKey: 'Nested', snpid: 'n03'),
+    );
+
+    final candidates = await scanner.scanDirectory(docs.path);
+
+    expect(candidates.single.contentPath, await library.resolveSymbolicLinks());
+  });
+
+  test(
+    'keeps ContentDir on the metadata folder when it already has content',
+    () async {
+      final library = await Directory.systemTemp.createTemp(
+        'klm-content-keep-',
+      );
+      addTearDown(() => library.delete(recursive: true));
+      await Directory('${library.path}/Instruments').create();
+      await File('${library.path}/Library.nicnt').writeAsString(
+        _productHints(name: 'Root Lib', regKey: 'Root Lib', snpid: 'n04'),
+      );
+
+      final candidates = await scanner.scanDirectory(library.path);
+
+      expect(
+        candidates.single.contentPath,
+        await library.resolveSymbolicLinks(),
+      );
+    },
+  );
+
+  test('scanDirectories returns empty when the picker is cancelled', () async {
+    final result = await scanner.scanDirectories(const []);
+    expect(result.candidates, isEmpty);
+    expect(result.skipped, isEmpty);
   });
 }
 

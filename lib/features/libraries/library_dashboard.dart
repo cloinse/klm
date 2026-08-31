@@ -615,18 +615,21 @@ class _LibraryActionController {
     required bool allowMultiple,
   }) async {
     try {
-      final candidates = await controller.chooseLibraryCandidates(
+      final scan = await controller.chooseLibraryCandidates(
         allowMultiple: allowMultiple,
       );
-      if (candidates.isEmpty || !context.mounted) return;
-      final candidatesToAdd = controller.candidatesNotRegistered(candidates);
+      if (scan.candidates.isEmpty || !context.mounted) return;
+      final candidatesToAdd = controller.candidatesNotRegistered(
+        scan.candidates,
+      );
       if (candidatesToAdd.isEmpty) {
-        throw LibraryAlreadyRegistered(candidates.first.metadata.name);
+        throw LibraryAlreadyRegistered(scan.candidates.first.metadata.name);
       }
       final confirmed = await _confirmCandidates(
         context,
         candidatesToAdd,
         repair: false,
+        skipped: scan.skipped,
       );
       if (!confirmed || !context.mounted) return;
       await runMutation(
@@ -643,15 +646,25 @@ class _LibraryActionController {
     KontaktLibrary library,
   ) async {
     try {
-      final candidates = await controller.chooseLibraryCandidates(
+      final scan = await controller.chooseLibraryCandidates(
         allowMultiple: false,
       );
-      if (candidates.isEmpty || !context.mounted) return;
-      final candidate = candidates.first;
-      if (!controller.candidateMatchesLibrary(candidate, library)) {
+      if (scan.candidates.isEmpty || !context.mounted) return;
+      final matches = scan.candidates
+          .where(
+            (candidate) =>
+                controller.candidateMatchesLibrary(candidate, library),
+          )
+          .toList(growable: false);
+      if (matches.isEmpty) {
         await _showMessage(context, context.l10n.tr('candidateMismatch'));
         return;
       }
+      if (matches.length > 1) {
+        await _showMessage(context, context.l10n.tr('candidateAmbiguous'));
+        return;
+      }
+      final candidate = matches.single;
       final confirmed = await _confirmCandidates(context, [
         candidate,
       ], repair: true);
@@ -671,11 +684,11 @@ class _LibraryActionController {
   ) async {
     if (libraries.isEmpty) return;
     try {
-      final candidates = await controller.chooseLibraryCandidates(
+      final scan = await controller.chooseLibraryCandidates(
         allowMultiple: true,
       );
-      if (candidates.isEmpty || !context.mounted) return;
-      final preview = controller.previewRepairs(libraries, candidates);
+      if (scan.candidates.isEmpty || !context.mounted) return;
+      final preview = controller.previewRepairs(libraries, scan.candidates);
       final confirmed =
           await showDialog<bool>(
             context: context,
@@ -697,6 +710,14 @@ class _LibraryActionController {
                           'ambiguous': preview.ambiguousLibraries.length,
                         }),
                       ),
+                      if (scan.skipped.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          context.l10n.format('skippedFoldersSummary', {
+                            'count': scan.skipped.length,
+                          }),
+                        ),
+                      ],
                       if (preview.matches.isNotEmpty) ...[
                         const SizedBox(height: 14),
                         Text(
@@ -910,6 +931,7 @@ class _LibraryActionController {
     BuildContext context,
     List<KontaktLibraryCandidate> candidates, {
     required bool repair,
+    List<LibraryCandidateSkip> skipped = const [],
   }) async {
     return await showDialog<bool>(
           context: context,
@@ -952,6 +974,14 @@ class _LibraryActionController {
                       ),
                     ),
                   ),
+                  if (skipped.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      context.l10n.format('skippedFoldersSummary', {
+                        'count': skipped.length,
+                      }),
+                    ),
+                  ],
                 ],
               ),
             ),

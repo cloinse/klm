@@ -612,7 +612,7 @@ class WindowsKontaktPlatform implements KontaktPlatform {
   }
 
   @override
-  Future<List<KontaktLibraryCandidate>> chooseLibraryCandidates({
+  Future<LibraryCandidateScanResult> chooseLibraryCandidates({
     required bool allowMultiple,
   }) async {
     const options = FileDialogOptions(canCreateDirectories: false);

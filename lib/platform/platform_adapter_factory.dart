@@ -41,7 +41,7 @@ class UnsupportedKontaktPlatform implements KontaktPlatform {
       _unsupported();
 
   @override
-  Future<List<KontaktLibraryCandidate>> chooseLibraryCandidates({
+  Future<LibraryCandidateScanResult> chooseLibraryCandidates({
     required bool allowMultiple,
   }) => _unsupported();
 

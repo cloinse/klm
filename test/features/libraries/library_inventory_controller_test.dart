@@ -437,9 +437,9 @@ class _OrderPlatform implements KontaktPlatform {
   Future<void> revealInFileManager(String path) async {}
 
   @override
-  Future<List<KontaktLibraryCandidate>> chooseLibraryCandidates({
+  Future<LibraryCandidateScanResult> chooseLibraryCandidates({
     required bool allowMultiple,
-  }) async => const [];
+  }) async => const LibraryCandidateScanResult(candidates: []);
 
   @override
   Future<String?> chooseContentDirectory() async => null;
