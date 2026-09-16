@@ -162,7 +162,7 @@ class AppLocalizations {
       'noLibraries': 'No libraries detected',
       'noMatchesMessage': 'Try another search or clear the filters.',
       'noLibrariesMessage':
-          'Install a library with Native Access and refresh the inventory.',
+          'Add a library in KLM or register it in Kontakt, then refresh the inventory.',
       'helperPendingTitle': 'Administrator component unavailable',
       'helperPendingMessage':
           'The inventory remains available in safe read-only mode. Record changes use a bundled one-time component and never require background access.',
@@ -275,9 +275,10 @@ class AppLocalizations {
       'operation_helper_enabled_title': 'Administrator component available',
       'operation_classic_order_saved_title': 'Classic order saved',
       'operation_classic_order_error_title': 'Classic order could not be saved',
-      'issue_missing_service_center': 'The Service Center XML is missing.',
+      'issue_missing_product_hints':
+          'The individual library XML is missing and the library is not listed in NativeAccess.xml.',
       'issue_missing_legacy_registration':
-          'The registration required by Kontakt 6 is missing.',
+          'The classic Kontakt registration is missing.',
       'issue_missing_installed_product': 'The Kontakt 7/8 manifest is missing.',
       'issue_hidden_in_kontakt':
           'Kontakt is hiding this library (Visibility={visibility}). Repair its records to show it.',
@@ -406,7 +407,7 @@ class AppLocalizations {
       'noLibraries': 'No se detectaron librerías',
       'noMatchesMessage': 'Prueba con otra búsqueda o elimina los filtros.',
       'noLibrariesMessage':
-          'Instala una librería con Native Access y actualiza el inventario.',
+          'Añade una librería en KLM o regístrala en Kontakt y actualiza el inventario.',
       'helperPendingTitle': 'Componente administrativo no disponible',
       'helperPendingMessage':
           'El inventario sigue disponible en modo seguro de lectura. Los cambios de registros utilizan un componente puntual incluido y nunca requieren acceso en segundo plano.',
@@ -524,9 +525,10 @@ class AppLocalizations {
       'operation_classic_order_saved_title': 'Orden clásico guardado',
       'operation_classic_order_error_title':
           'No se pudo guardar el orden clásico',
-      'issue_missing_service_center': 'Falta el XML de Service Center.',
+      'issue_missing_product_hints':
+          'Falta el XML individual y la librería no está en NativeAccess.xml.',
       'issue_missing_legacy_registration':
-          'Falta el registro requerido por Kontakt 6.',
+          'Falta el registro clásico de Kontakt.',
       'issue_missing_installed_product': 'Falta el manifiesto de Kontakt 7/8.',
       'issue_hidden_in_kontakt':
           'Kontakt está ocultando esta librería (Visibility={visibility}). Repara sus registros para mostrarla.',
@@ -656,7 +658,7 @@ class AppLocalizations {
       'noLibraries': 'Nenhuma biblioteca detectada',
       'noMatchesMessage': 'Tente outra busca ou remova os filtros.',
       'noLibrariesMessage':
-          'Instale uma biblioteca com o Native Access e atualize o inventário.',
+          'Adicione uma biblioteca no KLM ou registre-a no Kontakt e atualize o inventário.',
       'helperPendingTitle': 'Componente administrativo indisponível',
       'helperPendingMessage':
           'O inventário permanece disponível no modo seguro de somente leitura. As alterações de registros usam um componente pontual incluído e nunca exigem acesso em segundo plano.',
@@ -772,9 +774,10 @@ class AppLocalizations {
       'operation_classic_order_saved_title': 'Ordem clássica salva',
       'operation_classic_order_error_title':
           'Não foi possível salvar a ordem clássica',
-      'issue_missing_service_center': 'O XML do Service Center está ausente.',
+      'issue_missing_product_hints':
+          'Falta o XML individual e a biblioteca não está no NativeAccess.xml.',
       'issue_missing_legacy_registration':
-          'O registro exigido pelo Kontakt 6 está ausente.',
+          'O registro clássico do Kontakt está ausente.',
       'issue_missing_installed_product':
           'O manifesto do Kontakt 7/8 está ausente.',
       'issue_hidden_in_kontakt':
@@ -862,7 +865,7 @@ class AppLocalizations {
       'noMatches': '未找到匹配项',
       'noLibraries': '未检测到音色库',
       'noMatchesMessage': '请尝试其他搜索或清除筛选条件。',
-      'noLibrariesMessage': '请使用 Native Access 安装音色库并刷新清单。',
+      'noLibrariesMessage': '在 KLM 中添加音色库，或在 Kontakt 中注册后刷新清单。',
       'helperPendingTitle': '管理员组件不可用',
       'helperPendingMessage': '清单仍可在安全的只读模式下使用。记录更改使用随附的一次性组件，绝不要求后台访问。',
       'understood': '知道了',
@@ -965,8 +968,9 @@ class AppLocalizations {
       'operation_helper_enabled_title': '管理员组件可用',
       'operation_classic_order_saved_title': '已保存经典顺序',
       'operation_classic_order_error_title': '无法保存经典顺序',
-      'issue_missing_service_center': '缺少 Service Center XML。',
-      'issue_missing_legacy_registration': '缺少 Kontakt 6 所需的注册。',
+      'issue_missing_product_hints':
+          '缺少独立 XML，且 NativeAccess.xml 中未列出该音色库。',
+      'issue_missing_legacy_registration': '缺少 Kontakt 经典浏览器所需的注册。',
       'issue_missing_installed_product': '缺少 Kontakt 7/8 清单。',
       'issue_hidden_in_kontakt':
           'Kontakt 正在隐藏此音色库（可见性={visibility}）。请修复其记录以显示它。',

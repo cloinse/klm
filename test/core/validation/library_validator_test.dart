@@ -22,9 +22,79 @@ void main() {
     final result = validator.validate([library]).single;
     final codes = result.issues.map((issue) => issue.code);
 
-    expect(codes, contains('missing_installed_product'));
     expect(codes, contains('missing_content_path'));
+    expect(codes, isNot(contains('missing_installed_product')));
+    expect(codes, isNot(contains('missing_product_hints')));
     expect(result.health, LibraryHealth.error);
+  });
+
+  test('acepta librerías de terceros sin Native Access ni JSON', () {
+    final library = KontaktLibrary(
+      id: 'third-party',
+      name: 'Third Party Library',
+      regKey: 'Third Party Library',
+      snpid: 'ZA1',
+      contentPath: Directory.systemTemp.path,
+      visibility: 3,
+      sources: {
+        RegistrationSource.serviceCenter,
+        RegistrationSource.preferences,
+      },
+    );
+
+    final result = validator.validate([library]).single;
+
+    expect(result.issues, isEmpty);
+    expect(result.health, LibraryHealth.healthy);
+    expect(result.registeredForKontakt6, isTrue);
+    expect(result.registeredForKontakt78, isTrue);
+  });
+
+  test('acepta librerías cubiertas por NativeAccess.xml sin XML individual', () {
+    final library = KontaktLibrary(
+      id: 'official',
+      name: 'Official Kontakt Library',
+      regKey: 'Official Kontakt Library',
+      snpid: 'K54',
+      contentPath: Directory.systemTemp.path,
+      visibility: 3,
+      sources: {
+        RegistrationSource.nativeAccessCatalog,
+        RegistrationSource.preferences,
+        RegistrationSource.installedProducts,
+      },
+    );
+
+    final result = validator.validate([library]).single;
+
+    expect(result.issues, isEmpty);
+    expect(result.health, LibraryHealth.healthy);
+    expect(result.hasServiceCenter, isFalse);
+    expect(result.hasNativeAccessCatalog, isTrue);
+    expect(result.registeredForKontakt78, isTrue);
+  });
+
+  test('marca problemas si faltan el XML individual y NativeAccess.xml', () {
+    final library = KontaktLibrary(
+      id: 'incomplete',
+      name: 'Incomplete Library',
+      regKey: 'Incomplete Library',
+      snpid: 'K00',
+      contentPath: Directory.systemTemp.path,
+      visibility: 3,
+      sources: {
+        RegistrationSource.preferences,
+        RegistrationSource.installedProducts,
+      },
+    );
+
+    final result = validator.validate([library]).single;
+
+    expect(
+      result.issues.map((issue) => issue.code),
+      contains('missing_product_hints'),
+    );
+    expect(result.health, LibraryHealth.warning);
   });
 
   test('detecta SNPID duplicado', () {

@@ -2,6 +2,7 @@ import 'dart:io';
 
 enum RegistrationSource {
   serviceCenter,
+  nativeAccessCatalog,
   preferences,
   installedProducts,
   windowsRegistry,
@@ -62,6 +63,11 @@ class KontaktLibrary {
   bool get hasServiceCenter =>
       sources.contains(RegistrationSource.serviceCenter);
 
+  bool get hasNativeAccessCatalog =>
+      sources.contains(RegistrationSource.nativeAccessCatalog);
+
+  bool get hasProductHints => hasServiceCenter || hasNativeAccessCatalog;
+
   bool get hasLegacyRegistration =>
       sources.contains(RegistrationSource.preferences) ||
       sources.contains(RegistrationSource.windowsRegistry);
@@ -79,7 +85,12 @@ class KontaktLibrary {
   bool get registeredForKontakt6 =>
       hasServiceCenter && hasLegacyRegistration && supportsKontakt6;
 
-  bool get registeredForKontakt78 => hasInstalledProduct;
+  /// Classic browser registration used by Kontakt 7 and 8.
+  /// Kontakt writes installed_products JSON on launch, so that file is not
+  /// required beforehand. ContentDir is: without it Kontakt marks the
+  /// library as not found.
+  bool get registeredForKontakt78 =>
+      hasLegacyRegistration || hasInstalledProduct;
 
   bool get contentPathExists {
     final path = contentPath;

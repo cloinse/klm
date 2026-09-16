@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
+import 'package:kontakt_library_manager/core/metadata/native_access_catalog.dart';
 import 'package:kontakt_library_manager/core/metadata/product_hints_parser.dart';
 import 'package:kontakt_library_manager/core/models/kontakt_library.dart';
 import 'package:kontakt_library_manager/core/models/kontakt_mutation.dart';
@@ -10,6 +11,7 @@ import 'package:kontakt_library_manager/core/validation/classic_order_validator.
 import 'package:kontakt_library_manager/features/mutations/library_candidate_scanner.dart';
 import 'package:kontakt_library_manager/platform/inventory_assembler.dart';
 import 'package:kontakt_library_manager/platform/kontakt_platform.dart';
+import 'package:kontakt_library_manager/platform/macos/macos_content_path.dart';
 
 class MacOSKontaktPlatform implements KontaktPlatform {
   MacOSKontaktPlatform({
@@ -77,7 +79,11 @@ class MacOSKontaktPlatform implements KontaktPlatform {
 
     final libraries =
         await _validator.validateAsync(
-            assembler.build(),
+            await applyNativeAccessCatalogIfNeeded(
+              assembler.build(),
+              Directory(serviceCenterPath),
+              parser: _parser,
+            ),
             pathProbe: _probeContentPath,
           )
           ..sort(
@@ -112,6 +118,9 @@ class MacOSKontaktPlatform implements KontaktPlatform {
 
     await for (final entity in directory.list(followLinks: false)) {
       if (entity is! File || !entity.path.toLowerCase().endsWith('.xml')) {
+        continue;
+      }
+      if (NativeAccessCatalog.isCatalogFileName(_fileName(entity.path))) {
         continue;
       }
       try {
@@ -153,14 +162,6 @@ class MacOSKontaktPlatform implements KontaktPlatform {
   ) async {
     final directory = Directory(installedProductsPath);
     if (!await directory.exists()) {
-      diagnostics.add(
-        const InventoryDiagnostic(
-          code: 'installed_products_missing',
-          title: 'Catálogo moderno no encontrado',
-          message: 'No existe installed_products para Kontakt 7/8.',
-          severity: IssueSeverity.warning,
-        ),
-      );
       return;
     }
 
@@ -173,21 +174,34 @@ class MacOSKontaktPlatform implements KontaktPlatform {
         if (object is! Map<String, dynamic>) continue;
         final name = _stem(entity.path);
         final regKey = _stringValue(object, const ['RegKey', 'regKey']);
-        final snpid = _stringValue(object, const ['SNPID', 'snpid']);
-        final contentPath = _stringValue(object, const [
-          'ContentDir',
-          'contentDir',
-          'content_path',
-        ]);
+        var snpid = _stringValue(object, const ['SNPID', 'snpid']);
+        final contentPath = posixContentPath(
+          _stringValue(object, const [
+            'ContentDir',
+            'contentDir',
+            'content_path',
+          ]),
+        );
         final identities = _identities(name, regKey, snpid);
         if (_intersects(excludedIdentities, identities)) {
           continue;
         }
-        if (!_intersects(knownIdentities, identities) &&
-            (snpid == null || contentPath == null)) {
-          continue;
+        if (!_intersects(knownIdentities, identities)) {
+          if (contentPath == null) continue;
+          if (snpid == null) {
+            final metadata = await _candidateScanner.readKontaktLibraryMetadata(
+              contentPath,
+            );
+            if (metadata == null) continue;
+            snpid = metadata.snpid;
+          }
+        } else if (snpid == null && contentPath != null) {
+          final metadata = await _candidateScanner.readKontaktLibraryMetadata(
+            contentPath,
+          );
+          snpid = metadata?.snpid;
         }
-        knownIdentities.addAll(identities);
+        knownIdentities.addAll(_identities(name, regKey, snpid));
         assembler.add(
           name: name,
           regKey: regKey,
@@ -238,28 +252,46 @@ class MacOSKontaktPlatform implements KontaktPlatform {
         if (result.exitCode != 0) continue;
         final object = jsonDecode(result.stdout as String);
         if (object is! Map<String, dynamic>) continue;
-        final name = _stringValue(object, const ['Name', 'name']);
-        final snpid = _stringValue(object, const ['SNPID', 'snpid']);
-        if (name == null || snpid == null) continue;
-        final regKey = _stringValue(object, const ['RegKey', 'regKey']);
-        final contentPath = _stringValue(object, const [
-          'ContentDir',
-          'contentDir',
-        ]);
+        final fileName = _fileName(entity.path);
+        final name =
+            _stringValue(object, const ['Name', 'name']) ??
+            _libraryNameFromPlistFileName(fileName);
+        var snpid = _stringValue(object, const ['SNPID', 'snpid']);
+        if (name == null) continue;
+        final regKey = _stringValue(object, const ['RegKey', 'regKey']) ?? name;
+        final contentPath = posixContentPath(
+          _stringValue(object, const ['ContentDir', 'contentDir']),
+        );
         final visibility = _intValue(object, const [
           'Visibility',
           'visibility',
         ]);
+        final hu = _stringValue(object, const ['HU', 'hu']);
+        final jdx = _stringValue(object, const ['JDX', 'jdx']);
         final identities = _identities(name, regKey, snpid);
         if (_intersects(excludedIdentities, identities)) {
           continue;
         }
-        if (!_intersects(knownIdentities, identities) &&
-            contentPath == null &&
-            visibility == null) {
+        final isKnownLibrary = _intersects(knownIdentities, identities);
+        final looksLikeKontaktLibrary = _looksLikeInstallerLibraryPlist(
+          contentPath: contentPath,
+          visibility: visibility,
+          hu: hu,
+          jdx: jdx,
+        );
+        if (!isKnownLibrary && snpid == null && !looksLikeKontaktLibrary) {
           continue;
         }
-        knownIdentities.addAll(identities);
+        if (!isKnownLibrary && contentPath == null && visibility == null) {
+          continue;
+        }
+        if (snpid == null && contentPath != null) {
+          final metadata = await _candidateScanner.readKontaktLibraryMetadata(
+            contentPath,
+          );
+          snpid = metadata?.snpid;
+        }
+        knownIdentities.addAll(_identities(name, regKey, snpid));
         assembler.add(
           name: name,
           regKey: regKey,
@@ -370,6 +402,27 @@ class MacOSKontaktPlatform implements KontaktPlatform {
   }
 
   String _fileName(String path) => path.split('/').last;
+
+  String? _libraryNameFromPlistFileName(String fileName) {
+    const prefix = 'com.native-instruments.';
+    const suffix = '.plist';
+    final lower = fileName.toLowerCase();
+    if (!lower.startsWith(prefix) || !lower.endsWith(suffix)) return null;
+    final name = fileName
+        .substring(prefix.length, fileName.length - suffix.length)
+        .trim();
+    return name.isEmpty ? null : name;
+  }
+
+  bool _looksLikeInstallerLibraryPlist({
+    required String? contentPath,
+    required int? visibility,
+    required String? hu,
+    required String? jdx,
+  }) {
+    if (contentPath == null || contentPath.isEmpty) return false;
+    return visibility != null || hu != null || jdx != null;
+  }
 
   String _stem(String path) {
     final name = _fileName(path);

@@ -29,6 +29,47 @@ class ProductHintsParser {
   }
 
   ProductHintsDocument parseDocumentText(String source) {
+    final extracted = _extractProductHints(source);
+    final products = extracted.document.findAllElements('Product').toList();
+    if (products.length != 1) {
+      throw ProductHintsException(
+        'Se esperaba exactamente un producto y se encontraron ${products.length}.',
+      );
+    }
+
+    final metadata = _metadataFromProduct(products.single, strict: true);
+    if (metadata == null) {
+      throw const ProductHintsException(
+        'La metadata no contiene Name, RegKey y SNPID válidos.',
+      );
+    }
+    // Keep the original ProductHints bytes intact. Reformatting can drop
+    // attributes, ordering, or whitespace that Kontakt uses when resolving
+    // library files from Service Center XML.
+    return ProductHintsDocument(
+      metadata: metadata,
+      xml: extracted.declaration == null
+          ? extracted.fragment
+          : '${extracted.declaration}\n${extracted.fragment}',
+    );
+  }
+
+  List<ProductMetadata> parseCatalogText(String source) {
+    final extracted = _extractProductHints(source);
+    final products = <ProductMetadata>[];
+    for (final product in extracted.document.findAllElements('Product')) {
+      final metadata = _metadataFromProduct(product, strict: false);
+      if (metadata == null) continue;
+      products.add(metadata);
+    }
+    return products;
+  }
+
+  List<ProductMetadata> parseCatalogBytes(Uint8List bytes) {
+    return parseCatalogText(utf8.decode(bytes, allowMalformed: true));
+  }
+
+  _ExtractedProductHints _extractProductHints(String source) {
     final start = source.indexOf('<ProductHints');
     final endMarker = '</ProductHints>';
     final end = source.indexOf(endMarker, start < 0 ? 0 : start);
@@ -49,25 +90,35 @@ class ProductHintsParser {
     } on XmlParserException catch (error) {
       throw ProductHintsException('ProductHints contiene XML inválido: $error');
     }
+    return _ExtractedProductHints(
+      document: document,
+      fragment: fragment,
+      declaration: declaration,
+    );
+  }
 
-    final products = document.findAllElements('Product').toList();
-    if (products.length != 1) {
-      throw ProductHintsException(
-        'Se esperaba exactamente un producto y se encontraron ${products.length}.',
-      );
-    }
-
-    final product = products.single;
+  ProductMetadata? _metadataFromProduct(
+    XmlElement product, {
+    required bool strict,
+  }) {
     final name = _value(product, 'Name');
     final regKey = _value(product, 'RegKey');
     final snpid = _value(product, 'SNPID');
     if (name.isEmpty || regKey.isEmpty || snpid.isEmpty) {
-      throw const ProductHintsException(
-        'La metadata no contiene Name, RegKey y SNPID válidos.',
-      );
+      if (strict) {
+        throw const ProductHintsException(
+          'La metadata no contiene Name, RegKey y SNPID válidos.',
+        );
+      }
+      return null;
     }
-    _validateFilenameValue(name, 'Name');
-    _validateFilenameValue(regKey, 'RegKey');
+    try {
+      _validateFilenameValue(name, 'Name');
+      _validateFilenameValue(regKey, 'RegKey');
+    } on ProductHintsException {
+      if (strict) rethrow;
+      return null;
+    }
     String? minimumVersion;
     final applications = <String>{};
     for (final application in product.findAllElements('Application')) {
@@ -78,7 +129,7 @@ class ProductHintsParser {
       }
     }
 
-    final metadata = ProductMetadata(
+    return ProductMetadata(
       name: name,
       regKey: regKey,
       snpid: snpid,
@@ -93,13 +144,6 @@ class ProductHintsParser {
       poweredBy: _nullable(_value(product, 'PoweredBy')),
       icon: _nullable(_value(product, 'Icon')),
       applications: Set<String>.unmodifiable(applications),
-    );
-    // Keep the original ProductHints bytes intact. Reformatting can drop
-    // attributes, ordering, or whitespace that Kontakt uses when resolving
-    // library files from Service Center XML.
-    return ProductHintsDocument(
-      metadata: metadata,
-      xml: declaration == null ? fragment : '$declaration\n$fragment',
     );
   }
 
@@ -142,4 +186,16 @@ class ProductHintsDocument {
 
   final ProductMetadata metadata;
   final String xml;
+}
+
+class _ExtractedProductHints {
+  const _ExtractedProductHints({
+    required this.document,
+    required this.fragment,
+    required this.declaration,
+  });
+
+  final XmlDocument document;
+  final String fragment;
+  final String? declaration;
 }

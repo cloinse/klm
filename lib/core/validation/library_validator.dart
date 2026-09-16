@@ -108,11 +108,12 @@ class LibraryValidator {
             RegistrationSource.portableSettings,
           );
 
-          if (!library.hasServiceCenter && !hasPortableRegistration) {
+          if (!library.hasProductHints && !hasPortableRegistration) {
             issues.add(
               const LibraryIssue(
-                code: 'missing_service_center',
-                message: 'Falta el XML de Service Center.',
+                code: 'missing_product_hints',
+                message:
+                    'Falta el XML individual y la librería no está en NativeAccess.xml.',
                 severity: IssueSeverity.warning,
               ),
             );
@@ -121,16 +122,7 @@ class LibraryValidator {
             issues.add(
               const LibraryIssue(
                 code: 'missing_legacy_registration',
-                message: 'Falta el registro requerido por Kontakt 6.',
-                severity: IssueSeverity.warning,
-              ),
-            );
-          }
-          if (!library.hasInstalledProduct && !hasPortableRegistration) {
-            issues.add(
-              const LibraryIssue(
-                code: 'missing_installed_product',
-                message: 'Falta el manifiesto de Kontakt 7/8.',
+                message: 'Falta el registro clásico de Kontakt.',
                 severity: IssueSeverity.warning,
               ),
             );

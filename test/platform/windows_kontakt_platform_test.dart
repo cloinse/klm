@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -82,6 +83,110 @@ void main() {
       'Kontakt Library',
     ]);
   });
+
+  test(
+    'includes installer JSON libraries by reading Kontakt metadata on disk',
+    () async {
+      const channel = MethodChannel(
+        'com.juanayala.kontaktLibraryManager/windows_registry',
+      );
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+      messenger.setMockMethodCallHandler(channel, (call) async => const []);
+
+      final root = await Directory.systemTemp.createTemp(
+        'klm-windows-installer-',
+      );
+      addTearDown(() => root.delete(recursive: true));
+      final serviceCenter = await Directory('${root.path}/service').create();
+      final installed = await Directory('${root.path}/installed').create();
+      final content = await Directory('${root.path}/content').create();
+      final pluginContent = await Directory('${root.path}/plugin').create();
+      await File('${content.path}/Electric Mint.nicnt').writeAsString('''
+<ProductHints><Product>
+  <Name>Session Guitarist - Electric Mint</Name>
+  <RegKey>Session Guitarist - Electric Mint</RegKey>
+  <SNPID>K54</SNPID>
+  <Type>Content</Type>
+  <Relevance><Application>Kontakt</Application></Relevance>
+</Product></ProductHints>
+''');
+      await File(
+        '${installed.path}/Session Guitarist - Electric Mint.json',
+      ).writeAsString(
+        jsonEncode({'ContentDir': content.path, 'ContentVersion': '1.1.0'}),
+      );
+      await File('${installed.path}/Waves-CLA-76 Stereo.json').writeAsString(
+        jsonEncode({
+          'ContentDir': pluginContent.path,
+          'ContentVersion': '1.0.0',
+        }),
+      );
+
+      final snapshot = await WindowsKontaktPlatform(
+        serviceCenterPath: serviceCenter.path,
+        installedProductsPath: installed.path,
+      ).scanLibraries();
+
+      expect(snapshot.libraries.map((library) => library.name), [
+        'Session Guitarist - Electric Mint',
+      ]);
+      expect(snapshot.libraries.single.snpid, 'K54');
+      expect(snapshot.libraries.single.contentPath, content.path);
+    },
+  );
+
+  test(
+    'includes Registry installer libraries without SNPID when NICNT exists',
+    () async {
+      const channel = MethodChannel(
+        'com.juanayala.kontaktLibraryManager/windows_registry',
+      );
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+      final root = await Directory.systemTemp.createTemp(
+        'klm-windows-registry-installer-',
+      );
+      addTearDown(() => root.delete(recursive: true));
+      final serviceCenter = await Directory('${root.path}/service').create();
+      final installed = await Directory('${root.path}/installed').create();
+      final content = await Directory('${root.path}/content').create();
+      await File('${content.path}/Electric Mint.nicnt').writeAsString('''
+<ProductHints><Product>
+  <Name>Session Guitarist - Electric Mint</Name>
+  <RegKey>Session Guitarist - Electric Mint</RegKey>
+  <SNPID>K54</SNPID>
+  <Type>Content</Type>
+  <Relevance><Application>Kontakt</Application></Relevance>
+</Product></ProductHints>
+''');
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        return <Map<String, Object?>>[
+          <String, Object?>{
+            'name': 'Session Guitarist - Electric Mint',
+            'regKey': 'Session Guitarist - Electric Mint',
+            'contentPath': content.path,
+            'visibility': 3,
+          },
+        ];
+      });
+
+      final snapshot = await WindowsKontaktPlatform(
+        serviceCenterPath: serviceCenter.path,
+        installedProductsPath: installed.path,
+      ).scanLibraries();
+
+      expect(
+        snapshot.libraries.single.name,
+        'Session Guitarist - Electric Mint',
+      );
+      expect(snapshot.libraries.single.snpid, 'K54');
+      expect(snapshot.libraries.single.visibility, 3);
+    },
+  );
 
   test(
     'standard inventory prefers the native Windows registry bridge',
@@ -388,10 +493,7 @@ void main() {
         contains('key == "ContentDir" || key == "contentDir"'),
       );
       expect(nativeMutation, contains('key == "contentDir"'));
-      expect(
-        nativeMutation,
-        contains('canonical_key = "\\"ContentDir\\""'),
-      );
+      expect(nativeMutation, contains('canonical_key = "\\"ContentDir\\""'));
       expect(platform, contains('preferValues: true'));
       expect(nativeMutation, contains('ContentDirectoryJson('));
       expect(nativeMutation, contains('KEY_WOW64_64KEY'));

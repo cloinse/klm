@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:kontakt_library_manager/core/metadata/product_hints_parser.dart';
+import 'package:kontakt_library_manager/core/models/kontakt_library.dart';
 import 'package:kontakt_library_manager/core/models/kontakt_mutation.dart';
 
 class LibraryCandidateException implements Exception {
@@ -86,6 +87,17 @@ class LibraryCandidateScanner {
       candidates: _uniqueCandidates(candidates),
       skipped: skipped,
     );
+  }
+
+  Future<ProductMetadata?> readKontaktLibraryMetadata(String path) async {
+    final directory = Directory(path);
+    if (!await directory.exists()) return null;
+    if (_isFilesystemRoot(directory.path)) return null;
+    final outcome = await _readLibraryFolder(directory);
+    if (outcome.kind != _FolderKind.library || outcome.candidates.isEmpty) {
+      return null;
+    }
+    return outcome.candidates.first.metadata;
   }
 
   Future<List<KontaktLibraryCandidate>> scanDirectory(String path) async {

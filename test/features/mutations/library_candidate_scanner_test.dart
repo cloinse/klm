@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kontakt_library_manager/core/models/kontakt_library.dart';
 import 'package:kontakt_library_manager/core/models/kontakt_mutation.dart';
 import 'package:kontakt_library_manager/features/mutations/library_candidate_scanner.dart';
 
@@ -27,6 +28,32 @@ void main() {
     expect(candidates.single.productHintsXml, contains('<SNPID>za6</SNPID>'));
     expect(candidates.single.toUpsertRequest()['snpid'], 'za6');
     expect(candidates.single.toUpsertRequest().keys, isNot(contains('target')));
+  });
+
+  test(
+    'readKontaktLibraryMetadata returns null for non-Kontakt folders',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'klm-meta-empty-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+
+      expect(await scanner.readKontaktLibraryMetadata(directory.path), isNull);
+    },
+  );
+
+  test('readKontaktLibraryMetadata extracts Kontakt ProductHints', () async {
+    final directory = await Directory.systemTemp.createTemp('klm-meta-ok-');
+    addTearDown(() => directory.delete(recursive: true));
+    await File(
+      '${directory.path}/Library.nicnt',
+    ).writeAsString(_productHints(name: 'Mint', regKey: 'Mint', snpid: 'K54'));
+
+    final metadata = await scanner.readKontaktLibraryMetadata(directory.path);
+
+    expect(metadata?.name, 'Mint');
+    expect(metadata?.snpid, 'K54');
+    expect(metadata?.isKontaktLibraryMetadata, isTrue);
   });
 
   test('rejects a folder without Kontakt metadata', () async {

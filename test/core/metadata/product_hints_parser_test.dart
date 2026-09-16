@@ -172,4 +172,57 @@ otros datos
 
     expect(() => parser.parseText(xml), throwsA(isA<ProductHintsException>()));
   });
+
+  test('parsea NativeAccess.xml con varios productos e ignora incompletos', () {
+    const xml = '''
+<ProductHints>
+  <Product>
+    <Name>Service Center 2</Name>
+    <Type>Utility</Type>
+    <RegKey>ServiceCenter</RegKey>
+  </Product>
+  <Product>
+    <Name>Session Guitarist - Electric Mint</Name>
+    <Type>Content</Type>
+    <RegKey>Session Guitarist - Electric Mint</RegKey>
+    <SNPID>K54</SNPID>
+    <Relevance><Application minVersion="6.7.0">Kontakt</Application></Relevance>
+  </Product>
+  <Product>
+    <Name>Reaktor Factory Library</Name>
+    <RegKey>Reaktor Factory Library</RegKey>
+    <SNPID>R01</SNPID>
+    <Type>Content</Type>
+    <PoweredBy>Reaktor</PoweredBy>
+    <Relevance><Application>Reaktor</Application></Relevance>
+  </Product>
+</ProductHints>
+''';
+
+    final products = parser.parseCatalogText(xml);
+
+    expect(products, hasLength(2));
+    expect(
+      products.map((product) => product.name),
+      containsAll([
+        'Session Guitarist - Electric Mint',
+        'Reaktor Factory Library',
+      ]),
+    );
+    expect(
+      products.singleWhere((product) => product.snpid == 'K54').applications,
+      contains('kontakt'),
+    );
+  });
+
+  test('el XML individual sigue rechazando catálogos con varios productos', () {
+    const xml = '''
+<ProductHints>
+  <Product><Name>A</Name><RegKey>A</RegKey><SNPID>A01</SNPID></Product>
+  <Product><Name>B</Name><RegKey>B</RegKey><SNPID>B01</SNPID></Product>
+</ProductHints>
+''';
+
+    expect(() => parser.parseText(xml), throwsA(isA<ProductHintsException>()));
+  });
 }

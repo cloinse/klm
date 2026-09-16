@@ -5,6 +5,7 @@ import 'package:crypto/crypto.dart';
 import 'package:file_selector_platform_interface/file_selector_platform_interface.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:kontakt_library_manager/core/metadata/native_access_catalog.dart';
 import 'package:kontakt_library_manager/core/metadata/product_hints_parser.dart';
 import 'package:kontakt_library_manager/core/models/kontakt_library.dart';
 import 'package:kontakt_library_manager/core/models/kontakt_mutation.dart';
@@ -72,12 +73,13 @@ class WindowsKontaktPlatform implements KontaktPlatform {
     final publicDirectory =
         Platform.environment['PUBLIC'] ?? r'C:\Users\Public';
 
+    final serviceCenter = Directory(
+      serviceCenterPath ??
+          '$programFiles${Platform.pathSeparator}Common Files${Platform.pathSeparator}Native Instruments${Platform.pathSeparator}Service Center',
+    );
     final xmlStopwatch = Stopwatch()..start();
     await _readXmlDirectory(
-      Directory(
-        serviceCenterPath ??
-            '$programFiles${Platform.pathSeparator}Common Files${Platform.pathSeparator}Native Instruments${Platform.pathSeparator}Service Center',
-      ),
+      serviceCenter,
       assembler,
       diagnostics,
       knownIdentities,
@@ -98,7 +100,7 @@ class WindowsKontaktPlatform implements KontaktPlatform {
     jsonStopwatch.stop();
     final loadedRegistry = await registryResult;
     diagnostics.addAll(loadedRegistry.diagnostics);
-    _addRegistryRecords(
+    await _addRegistryRecords(
       loadedRegistry.records,
       assembler,
       knownIdentities,
@@ -108,7 +110,11 @@ class WindowsKontaktPlatform implements KontaktPlatform {
     final validationStopwatch = Stopwatch()..start();
     final libraries =
         await _validator.validateAsync(
-            assembler.build(),
+            await applyNativeAccessCatalogIfNeeded(
+              assembler.build(),
+              serviceCenter,
+              parser: _parser,
+            ),
             pathProbe: _probeContentPath,
           )
           ..sort(
@@ -221,6 +227,11 @@ class WindowsKontaktPlatform implements KontaktPlatform {
       if (entity is! File || !entity.path.toLowerCase().endsWith('.xml')) {
         continue;
       }
+      if (NativeAccessCatalog.isCatalogFileName(
+        entity.path.split(Platform.pathSeparator).last,
+      )) {
+        continue;
+      }
       try {
         final metadata = _parser.parseBytes(await entity.readAsBytes());
         if (!metadata.isKontaktLibraryMetadata) {
@@ -277,6 +288,7 @@ class WindowsKontaktPlatform implements KontaktPlatform {
       unavailableTitle: 'Catálogo moderno no disponible',
       unavailableMessage:
           'Windows no pudo enumerar la carpeta installed_products.',
+      reportIfMissing: false,
     );
     for (final entity in entities) {
       if (entity is! File || !entity.path.toLowerCase().endsWith('.json')) {
@@ -288,19 +300,30 @@ class WindowsKontaktPlatform implements KontaktPlatform {
         final fileName = entity.path.split(Platform.pathSeparator).last;
         final name = fileName.substring(0, fileName.length - 5);
         final regKey = decoded['RegKey'] as String?;
-        final snpid = decoded['SNPID'] as String?;
+        var snpid = decoded['SNPID'] as String?;
         final contentPath =
             (decoded['ContentDir'] ?? decoded['contentDir']) as String?;
         final identities = _identities(name, regKey, snpid);
         if (_intersects(excludedIdentities, identities)) {
           continue;
         }
-        if (!_intersects(knownIdentities, identities) &&
-            (snpid?.trim().isEmpty != false ||
-                contentPath?.trim().isEmpty != false)) {
-          continue;
+        if (!_intersects(knownIdentities, identities)) {
+          if (contentPath?.trim().isNotEmpty != true) continue;
+          if (snpid?.trim().isNotEmpty != true) {
+            final metadata = await _candidateScanner.readKontaktLibraryMetadata(
+              contentPath!.trim(),
+            );
+            if (metadata == null) continue;
+            snpid = metadata.snpid;
+          }
+        } else if (snpid?.trim().isNotEmpty != true &&
+            contentPath?.trim().isNotEmpty == true) {
+          final metadata = await _candidateScanner.readKontaktLibraryMetadata(
+            contentPath!.trim(),
+          );
+          snpid = metadata?.snpid ?? snpid;
         }
-        knownIdentities.addAll(identities);
+        knownIdentities.addAll(_identities(name, regKey, snpid));
         assembler.add(
           name: name,
           regKey: regKey,
@@ -365,12 +388,16 @@ class WindowsKontaktPlatform implements KontaktPlatform {
     required String unavailableCode,
     required String unavailableTitle,
     required String unavailableMessage,
+    bool reportIfMissing = true,
   }) async {
     try {
       return await directory.list(followLinks: false).toList();
     } on FileSystemException catch (error) {
       final code = error.osError?.errorCode;
       final isMissing = code == 2 || code == 3 || code == 15;
+      if (isMissing && !reportIfMissing) {
+        return const <FileSystemEntity>[];
+      }
       final isPermissionDenied = code == 5;
       diagnostics.add(
         InventoryDiagnostic(
@@ -479,28 +506,36 @@ class WindowsKontaktPlatform implements KontaktPlatform {
     return records;
   }
 
-  void _addRegistryRecords(
+  Future<void> _addRegistryRecords(
     List<Map<String, Object?>> records,
     InventoryAssembler assembler,
     Set<String> knownIdentities,
     Set<String> excludedIdentities,
-  ) {
+  ) async {
     for (final record in records) {
       final regKey = record['regKey'] as String?;
-      final snpid = record['snpid'] as String?;
+      var snpid = record['snpid'] as String?;
       final contentPath = record['contentPath'] as String?;
       if (regKey == null) continue;
       final name = record['name'] as String? ?? regKey;
       final identities = _identities(name, regKey, snpid);
       final isKnownLibrary = _intersects(knownIdentities, identities);
       final isExcluded = _intersects(excludedIdentities, identities);
-      final hasLibraryIdentity =
-          snpid?.trim().isNotEmpty == true &&
-          contentPath?.trim().isNotEmpty == true;
-      if (isExcluded || (!isKnownLibrary && !hasLibraryIdentity)) {
-        continue;
+      if (isExcluded) continue;
+      if (!isKnownLibrary) {
+        final hasSnpidAndPath =
+            snpid?.trim().isNotEmpty == true &&
+            contentPath?.trim().isNotEmpty == true;
+        if (!hasSnpidAndPath) {
+          if (contentPath?.trim().isNotEmpty != true) continue;
+          final metadata = await _candidateScanner.readKontaktLibraryMetadata(
+            contentPath!.trim(),
+          );
+          if (metadata == null) continue;
+          snpid = metadata.snpid;
+        }
       }
-      knownIdentities.addAll(identities);
+      knownIdentities.addAll(_identities(name, regKey, snpid));
       assembler.add(
         name: name,
         regKey: regKey,
