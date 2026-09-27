@@ -3,21 +3,19 @@
   <channel>
     <title>Kontakt Library Manager - Windows</title>
     <item>
-      <title>0.3.3</title>
-      <pubDate>Wed, 16 Sep 2026 07:26:23 GMT</pubDate>
-      <sparkle:version>25</sparkle:version>
-      <sparkle:shortVersionString>0.3.3</sparkle:shortVersionString>
+      <title>0.3.4</title>
+      <pubDate>Sun, 27 Sep 2026 22:55:26 GMT</pubDate>
+      <sparkle:version>26</sparkle:version>
+      <sparkle:shortVersionString>0.3.4</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>10.0</sparkle:minimumSystemVersion>
-      <description sparkle:format="plain-text"><![CDATA[- Improved library detection.
-- Performance improvements.
-- Security improvements.]]></description>
+      <description sparkle:format="plain-text"><![CDATA[- Fixed Show in Folder on Windows when the library path contains spaces.]]></description>
       <enclosure
-        url="https://github.com/cloinse/klm/releases/download/v0.3.3/klm-windows-v0.3.3.exe"
-        length="14160070"
+        url="https://github.com/cloinse/klm/releases/download/v0.3.4/klm-windows-v0.3.4.exe"
+        length="14161481"
         type="application/octet-stream"
         sparkle:os="windows-x64"
         sparkle:installerArguments="/SILENT /SP- /NOICONS /NORESTART"
-        sparkle:edSignature="I3sof4SrXwq1E6roE3hJbc1j8xvhMWgJns8002G/VYHWMkS295a1/Xztrueu9UJranqAHpD3+0uGaSsV1rT2Cw=="
+        sparkle:edSignature="qayJr56znmutb5SQRxGztA+Xn8fWab1J5I/TOpzf0pL7/oXv1XLH+LDNV85OuZiwnR5zmTwlD9K1wpCJDdd4AQ=="
       />
     </item>
   </channel>
