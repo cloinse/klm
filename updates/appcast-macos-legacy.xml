@@ -4,18 +4,20 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     <channel>
         <title>Kontakt Library Manager</title>
         <item>
-            <title>0.3.4</title>
-            <pubDate>Sun, 27 Sep 2026 22:54:44 +0000</pubDate>
-            <sparkle:version>26</sparkle:version>
-            <sparkle:shortVersionString>0.3.4</sparkle:shortVersionString>
+            <title>0.3.3</title>
+            <pubDate>Wed, 16 Sep 2026 07:25:47 +0000</pubDate>
+            <sparkle:version>25</sparkle:version>
+            <sparkle:shortVersionString>0.3.3</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>10.15</sparkle:minimumSystemVersion>
                   <description sparkle:format="plain-text"><![CDATA[
-- Fixed Show in Folder on Windows when the library path contains spaces.
+- Improved library detection.
+- Performance improvements.
+- Security improvements.
 ]]></description>
-<enclosure url="https://github.com/cloinse/klm/releases/download/v0.3.4/klm-macos-v0.3.4.dmg" length="21847198" type="application/octet-stream" sparkle:edSignature="MDKgKf6e4Gs7clUYAp4q+IlUB09w00Se93e4/tTeOqV5Z2UeNNsMfxBEPWeeWSNILnOf1ShtxDV8HIvGH3ggDA=="></enclosure>
+<enclosure url="https://github.com/cloinse/klm/releases/download/v0.3.3/klm-macos-v0.3.3.dmg" length="21847130" type="application/octet-stream" sparkle:edSignature="skFsTTdxTxn+Tnjz6Z71k4FIkgdigaIJwbcpu5fZTc4Gx2fJdf5ehBP57qfDYN+PFeQGbaUj43GAPY5oNjdFCQ=="></enclosure>
         </item>
     </channel>
 </rss><!-- sparkle-signatures:
-edSignature: woPjlRKj+HzqdaeZxLXsPdj+btf7XqZFS+RBqBxcnmcktihPxM1vNf5WZasSEnGnyoVtIeDV4cijGS0RGa8uAA==
-length: 1203
+edSignature: 1zNmIlR9c6vWR42hoI92HaozErZl2bgK0ZDRRIAoXfu+qz7FpEGK8lUfVw++ccOVympH3e8Bh1IQCht4t5uvAw==
+length: 1213
 -->
