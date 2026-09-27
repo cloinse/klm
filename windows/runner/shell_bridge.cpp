@@ -2,7 +2,7 @@
 
 #include <flutter/standard_method_codec.h>
 #include <windows.h>
-#include <shlobj.h>
+#include <shellapi.h>
 
 #include <cwctype>
 #include <string>
@@ -26,8 +26,6 @@ std::wstring Utf16FromUtf8(const std::string& utf8) {
   return utf16;
 }
 
-// Explorer's /select parser stops at the first space unless the quotes sit
-// after the comma. SHOpenFolderAndSelectItems takes the path directly.
 std::wstring NormalizeExplorerPath(std::wstring path) {
   for (wchar_t& character : path) {
     if (character == L'/') character = L'\\';
@@ -45,13 +43,26 @@ std::wstring NormalizeExplorerPath(std::wstring path) {
   return path;
 }
 
-const char* RevealInExplorer(const std::wstring& path) {
+const char* OpenLibraryFolder(const std::wstring& path) {
   if (path.empty()) return "invalid_path";
-  PIDLIST_ABSOLUTE item = ::ILCreateFromPathW(path.c_str());
-  if (item == nullptr) return "path_not_found";
-  const HRESULT result = ::SHOpenFolderAndSelectItems(item, 0, nullptr, 0);
-  ::ILFree(item);
-  if (FAILED(result)) return "explorer_failed";
+  const DWORD attributes = ::GetFileAttributesW(path.c_str());
+  if (attributes == INVALID_FILE_ATTRIBUTES) {
+    const DWORD error = ::GetLastError();
+    if (error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND) {
+      return "path_not_found";
+    }
+    return "explorer_failed";
+  }
+  if ((attributes & FILE_ATTRIBUTE_DIRECTORY) == 0) return "path_not_found";
+
+  // explore opens this folder. Selecting it would leave Explorer in the parent.
+  SHELLEXECUTEINFOW execute{};
+  execute.cbSize = sizeof(execute);
+  execute.fMask = SEE_MASK_FLAG_NO_UI;
+  execute.lpVerb = L"explore";
+  execute.lpFile = path.c_str();
+  execute.nShow = SW_SHOWNORMAL;
+  if (!::ShellExecuteExW(&execute)) return "explorer_failed";
   return nullptr;
 }
 
@@ -84,7 +95,7 @@ void ShellBridge::HandleMethodCall(
     return;
   }
   const std::wstring path = NormalizeExplorerPath(Utf16FromUtf8(*utf8_path));
-  const char* error_code = RevealInExplorer(path);
+  const char* error_code = OpenLibraryFolder(path);
   if (error_code != nullptr) {
     result->Error(error_code, "Explorer could not show the library folder.");
     return;

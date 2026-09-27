@@ -1,1 +1,1 @@
-- Fixed Show in Folder on Windows when the library path contains spaces.
+- Fixed Show in Folder on Windows so it opens the library folder, including paths that contain spaces.

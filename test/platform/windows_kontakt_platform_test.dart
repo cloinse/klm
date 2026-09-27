@@ -547,7 +547,7 @@ void main() {
     );
   });
 
-  test('selects the library folder instead of launching explorer.exe', () {
+  test('opens the library folder instead of launching explorer.exe', () {
     final platform = _source(
       'lib/platform/windows/windows_kontakt_platform.dart',
     );
@@ -556,7 +556,9 @@ void main() {
 
     expect(platform, isNot(contains('explorer.exe')));
     expect(platform, contains("'revealInExplorer'"));
-    expect(shellBridge, contains('SHOpenFolderAndSelectItems'));
+    expect(shellBridge, contains('ShellExecuteExW'));
+    expect(shellBridge, contains('L"explore"'));
+    expect(shellBridge, isNot(contains('SHOpenFolderAndSelectItems')));
     expect(shellBridge, contains('call.method_name() != "revealInExplorer"'));
     expect(window, contains('ShellBridge'));
   });
