@@ -1,3 +1,1 @@
-- Improved library detection.
-- Performance improvements.
-- Security improvements.
+- Fixed Show in Folder on Windows when the library path contains spaces.

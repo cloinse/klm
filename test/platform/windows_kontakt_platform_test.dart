@@ -500,6 +500,66 @@ void main() {
       expect(nativeMutation, contains('KEY_WOW64_32KEY'));
     },
   );
+
+  test(
+    'reveals a library folder with spaces through the shell bridge',
+    () async {
+      const channel = MethodChannel(
+        'com.juanayala.kontaktLibraryManager/windows_shell',
+      );
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+      String? revealed;
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        expect(call.method, 'revealInExplorer');
+        revealed = call.arguments as String;
+        return null;
+      });
+
+      await WindowsKontaktPlatform().revealInFileManager(
+        r'C:\Users\Public\Documents\Kontakt Content Library\24K Drums\',
+      );
+
+      expect(
+        revealed,
+        r'C:\Users\Public\Documents\Kontakt Content Library\24K Drums',
+      );
+    },
+  );
+
+  test('reports a real Explorer failure for the library folder', () async {
+    const channel = MethodChannel(
+      'com.juanayala.kontaktLibraryManager/windows_shell',
+    );
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      throw PlatformException(code: 'path_not_found', message: 'missing');
+    });
+
+    await expectLater(
+      WindowsKontaktPlatform().revealInFileManager(
+        r'C:\Users\Public\Documents\Kontakt Content Library\24K Drums',
+      ),
+      throwsA(isA<FileSystemException>()),
+    );
+  });
+
+  test('selects the library folder instead of launching explorer.exe', () {
+    final platform = _source(
+      'lib/platform/windows/windows_kontakt_platform.dart',
+    );
+    final shellBridge = _source('windows/runner/shell_bridge.cpp');
+    final window = _source('windows/runner/flutter_window.cpp');
+
+    expect(platform, isNot(contains('explorer.exe')));
+    expect(platform, contains("'revealInExplorer'"));
+    expect(shellBridge, contains('SHOpenFolderAndSelectItems'));
+    expect(shellBridge, contains('call.method_name() != "revealInExplorer"'));
+    expect(window, contains('ShellBridge'));
+  });
 }
 
 String _source(String path) =>

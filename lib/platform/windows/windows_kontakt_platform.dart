@@ -21,6 +21,9 @@ class WindowsKontaktPlatform implements KontaktPlatform {
   static const _registryChannel = MethodChannel(
     'com.juanayala.kontaktLibraryManager/windows_registry',
   );
+  static const _shellChannel = MethodChannel(
+    'com.juanayala.kontaktLibraryManager/windows_shell',
+  );
 
   WindowsKontaktPlatform({
     ProductHintsParser parser = const ProductHintsParser(),
@@ -593,10 +596,30 @@ class WindowsKontaktPlatform implements KontaktPlatform {
 
   @override
   Future<void> revealInFileManager(String path) async {
-    final result = await Process.run('explorer.exe', ['/select,$path']);
-    if (result.exitCode != 0) {
+    try {
+      await _shellChannel.invokeMethod<void>(
+        'revealInExplorer',
+        _windowsRevealPath(path),
+      );
+    } on MissingPluginException {
+      throw PlatformException(
+        code: 'native_shell_bridge_unavailable',
+        message:
+            'The native Windows shell component is unavailable. Reinstall or update Kontakt Library Manager.',
+      );
+    } on PlatformException {
       throw FileSystemException('El Explorador no pudo mostrar la ruta.', path);
     }
+  }
+
+  /// Drops a trailing separator. A drive root such as `C:\` stays intact.
+  String _windowsRevealPath(String path) {
+    var normalized = path.trim().replaceAll('/', r'\');
+    while (normalized.length > 3 &&
+        (normalized.endsWith(r'\') || normalized.endsWith(' '))) {
+      normalized = normalized.substring(0, normalized.length - 1);
+    }
+    return normalized;
   }
 
   @override
